@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Game panel</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+        <style>
+            body {
+                background-color: #f5f5fa;
+            }
+
+            .navbar {
+                padding: 10px 20px;
+            }
+
+            .card {
+                border-radius: 10px;
+            }
+
+        </style>
+        <script>
+            function sendAction(url) {
+                fetch(url, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        const statusDiv = document.getElementById(`status-${data.prop_id}`);
+                        if (statusDiv) statusDiv.textContent = data.status;
+                    })
+                    .catch(err => console.error(err));
+            }
+
+            function sendAllAction(url) {
+                fetch(url, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        for (const propId in data.updated) {
+                            const statusDiv = document.getElementById(`status-${propId}`);
+                            if (statusDiv) statusDiv.textContent = data.updated[propId];
+                        }
+                    })
+                    .catch(err => console.error(err));
+            }
+            function sendHint(propId, hintName) {
+                fetch(`/hint/${propId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hint: hintName })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const statusDiv = document.getElementById(`status-${data.prop_id}`);
+                    if (statusDiv) statusDiv.textContent = data.hint;
+                })
+                .catch(err => console.error(err));
+            }
+            </script>
+
+
+    </head>
+    <body class="bg-light">
+
+        <div class="container mt-4 text-center">
+            <h2>{{ page_title }}</h2>
+
+            <div style="margin-bottom: 20px;">
+                <button onclick="sendAllAction('/start_all')" class="btn btn-primary">START GAME</button>
+                <button onclick="sendAllAction('/reset_all')" class="btn btn-danger">RESET ALL</button>
+            </div>
+
+            {% for prop in props %}
+            <div class="card p-3 mb-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div><strong>{{ prop.id }}. {{ prop.name }}</strong></div>
+                </div>
+                <div class="d-flex w-100">
+                    <div class="d-flex" style="flex: 0 0 49%; gap: 5px;">
+                        <button onclick="sendAction('/reset/{{ prop.id }}')" class="btn btn-danger btn-sm flex-fill">Reset</button>
+                        <button onclick="sendAction('/activate/{{ prop.id }}')" class="btn btn-warning btn-sm flex-fill">Activate</button>
+                        <button onclick="sendAction('/finish/{{ prop.id }}')" class="btn btn-success btn-sm flex-fill">Finish</button>
+                    </div>
+
+                    <div class="d-flex flex-wrap ms-3" style="flex: 0 0 50%; gap: 5px;">
+                        {% for hint in prop.hints %}
+                            <button onclick="sendHint({{ prop.id }}, '{{ hint }}')" class="btn btn-info btn-sm flex-fill">{{ hint }}</button>
+                        {% endfor %}
+                    </div>
+
+                </div>
+
+                <div id="status-{{ prop.id }}" class="mt-2">
+                    {{ prop_status[prop.id] }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </body>
+</html>
