@@ -1,6 +1,12 @@
 version: '3.3'
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   gamepanel:
     build:
       context: .
@@ -10,4 +16,15 @@ services:
     restart: unless-stopped
     volumes:
       - .:/capp
+    depends_on:
+      - redis
+   
 
+  # game:
+  #   build:
+  #     context: ./game
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - redis
+  #   command: python game_server.py
