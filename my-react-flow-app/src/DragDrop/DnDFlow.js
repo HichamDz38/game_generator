@@ -98,6 +98,29 @@ const DnDFlow = () => {
      alert(`Save failed: ${error.response?.data?.message || error.message}`);
    }
  };
+  const loadFlowfrombackend = async (flowId) => {
+   try {
+     const response = await axios.get(`/api/load-flow/${flowId}`);
+    
+     if (response.data.error) {
+       throw new Error(response.data.error);
+     }
+    
+     setNodes(response.data.nodes || []);
+     setEdges(response.data.edges || []);
+    
+     if (response.data.viewport && rfInstance) {
+       rfInstance.setViewport(response.data.viewport);
+     }
+    
+     alert('Flow loaded successfully!');
+   } catch (error) {
+     console.error('Load error details:', error.response?.data);
+     alert(`Failed to load flow: ${error.response?.data?.error || 
+            error.response?.data?.message || 
+            error.message}`);
+   }
+ };
  
   const onRestore = useCallback(() => {
     const restoreFlow = async () => {
@@ -143,6 +166,20 @@ const DnDFlow = () => {
         }}>
           SendTobackend
         </button>
+        <div style={{ position: 'absolute', top: '-5px', right: '1080px', zIndex: 1000 }}>
+        <input 
+          type="text" 
+          placeholder="Paste Flow ID" 
+          id="flowIdInput"
+          style={{ marginRight: '10px', padding: '5px' }}
+        />
+        <button 
+          onClick={() => loadFlowfrombackend(document.getElementById('flowIdInput').value)}
+          style={{ padding: '5px 10px', background: '#1b154dff', color: 'white' }}
+        >
+          Load Flow
+        </button>
+        </div>
         
       </Panel>
 
@@ -175,29 +212,7 @@ export default DnDFlow;
 
 
 
-//   const loadFlow = async (flowId) => {
-//   try {
-//     const response = await axios.get(`/api/load-flow/${flowId}`);
-    
-//     if (response.data.error) {
-//       throw new Error(response.data.error);
-//     }
-    
-//     setNodes(response.data.nodes || []);
-//     setEdges(response.data.edges || []);
-    
-//     if (response.data.viewport && reactFlowInstance) {
-//       reactFlowInstance.setViewport(response.data.viewport);
-//     }
-    
-//     alert('Flow loaded successfully!');
-//   } catch (error) {
-//     console.error('Load error details:', error.response?.data);
-//     alert(`Failed to load flow: ${error.response?.data?.error || 
-//            error.response?.data?.message || 
-//            error.message}`);
-//   }
-// };
+
 
 // Usage example :
 // loadFlow('668a2e9d-2292-45e6-b0db-165ebe69213c')
