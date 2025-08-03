@@ -8,6 +8,8 @@ import uuid
 
 redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
 
+# redis_client = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -31,41 +33,38 @@ def get_devices():
     connected_dev = redis_client.get("connected_devices")
     return json.dumps(connected_dev)
 
-@app.route('/api/save-flow', methods=['POST'])
+@app.route('/api/save_flow', methods=['POST'])
 def save_flow():
-        data = request.get_json()
-        if not data:
-            return jsonify({'message': 'No data provided'}), 400
+    flow_data = request.get_json()
+    flow_name = flow_data["name"]
+    del flow_data["name"]
+    if not flow_data:
+        return jsonify({'message': 'No data provided'}), 400
 
-        nodes = data.get('nodes')
-        edges = data.get('edges')
-        flow_id = str(uuid.uuid4())
-        redis_client.set(f"flow:{flow_id}",json.dumps(data))
+    print(flow_data)
+    redis_client.set(f"scenarios[{flow_name}]",json.dumps(flow_data))
 
-        print(f"Received nodes: {nodes}")
-        print(f"Received edges: {edges}")
-
-        return jsonify({
-        'message': 'Flow data received successfully',
-        'flow_id': flow_id 
-        }), 200
+    return jsonify({
+    'message': 'Flow data received successfully2',
+    'flow_id': flow_name 
+    }), 200
 
     
 
-# @app.route('/api/load-flow/<flow_id>', methods=['GET'])
-# def load_flow(flow_id):
-#     try:
-#         flow_data = redis_client.get(f"flow:{flow_id}")
-#         if not flow_data:
-#             return jsonify({"error": "Flow not found"}), 404
+@app.route('/api/load-flow/<flow_id>', methods=['GET'])
+def load_flow(flow_id):
+    try:
+        flow_data = redis_client.get(f"scenarios[{flow_id}]")
+        if not flow_data:
+            return jsonify({"error": "Flow not found"}), 404
             
-#         return jsonify(json.loads(flow_data))
+        return jsonify(json.loads(flow_data))
         
-#     except Exception as e:
-#         return jsonify({
-#             "status": "error",
-#             "message": str(e)
-#         }), 500
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
 @app.route('/reset/<device_id>', methods=['POST'])
