@@ -2,8 +2,16 @@
     flex-direction: column;
     display: flex;
     flex-grow: 1;
-    height: 100%;
+    position: absolute;
+    padding: 20rem;
+    height: 50%;
+    width : 50%;
   }
+
+.navbar {
+    position: absolute;
+    padding: 10rem;
+}
   
   .dndflow aside {
     border-right: 1px solid #eee;
@@ -118,4 +126,10 @@ padding: 5px;
 } 
 label{
   color: white;
+}
+
+.navbar ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
 }
