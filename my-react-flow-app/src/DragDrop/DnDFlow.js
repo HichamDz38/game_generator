@@ -36,24 +36,9 @@ const DnDFlow = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected'); 
   const [editValue, setEditValue] = useState(nodes.data);
   const [id, setId] = useState();
   const { setViewport } = useReactFlow();
-
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        await axios.get('/ping');
-        setConnectionStatus('connected');
-      } catch (error) {
-        setConnectionStatus('disconnected');
-      }
-    };
-    checkConnection();
-    const interval = setInterval(checkConnection, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const onNodeClick = (e, val) => {
     setEditValue(val.data.label);
@@ -98,6 +83,21 @@ const DnDFlow = () => {
       localStorage.setItem(flowKey, JSON.stringify(flow));
     }
   }, [rfInstance]);
+ const saveFlowToBackend = async () => {
+   try {
+     const response = await axios.post('/api/save-flow', {
+       nodes,
+       edges
+     });
+    
+     console.log('Flow saved with ID:', response.data.flow_id);
+     alert(`Flow saved! ID: ${response.data.flow_id}`);
+    
+   } catch (error) {
+     console.error('Full error:', error.response?.data);
+     alert(`Save failed: ${error.response?.data?.message || error.message}`);
+   }
+ };
  
   const onRestore = useCallback(() => {
     const restoreFlow = async () => {
@@ -120,9 +120,30 @@ const DnDFlow = () => {
         <button className="xy-theme__button" onClick={onSave}>
           save
         </button>
+
         <button className="xy-theme__button" onClick={onRestore}>
           restore
         </button>
+
+        <button class="backend"
+         onClick={saveFlowToBackend}
+         style={{
+        position: 'absolute',
+        top: '10px',
+        right: '1300px',
+        padding: '8px 16px',
+        background: '#1b154dff',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        zIndex: 1000,
+        border: '2px solid red', 
+        fontSize: '20px'
+        }}>
+          SendTobackend
+        </button>
+        
       </Panel>
 
       <ReactFlowProvider>
@@ -153,23 +174,6 @@ export default DnDFlow;
 
 
 
-
-
-//   const saveFlowToBackend = async () => {
-//   try {
-//     const response = await axios.post('/api/save-flow', {
-//       nodes,
-//       edges
-//     });
-    
-//     console.log('Flow saved with ID:', response.data.flow_id);
-//     alert(`Flow saved! ID: ${response.data.flow_id}`);
-    
-//   } catch (error) {
-//     console.error('Full error:', error.response?.data);
-//     alert(`Save failed: ${error.response?.data?.message || error.message}`);
-//   }
-// };
 
 //   const loadFlow = async (flowId) => {
 //   try {
