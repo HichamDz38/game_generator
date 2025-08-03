@@ -31,63 +31,42 @@ def get_devices():
     connected_dev = redis_client.get("connected_devices")
     return json.dumps(connected_dev)
 
-@app.route('/react')
-def serve_react(path='index.html'):
-    react_dir = os.path.join('my-react-flow-app', 'src')
-    return send_from_directory(react_dir, path)
-
 @app.route('/api/save-flow', methods=['POST'])
 def save_flow():
-    try:
-        flow_data = request.get_json()
-        if not flow_data:
-            return jsonify({"error": "No data provided"}), 400
-        
-        if 'nodes' not in flow_data or 'edges' not in flow_data:
-            return jsonify({"error": "Missing nodes or edges in data"}), 400
-        
+        data = request.get_json()
+        if not data:
+            return jsonify({'message': 'No data provided'}), 400
+
+        nodes = data.get('nodes')
+        edges = data.get('edges')
         flow_id = str(uuid.uuid4())
-        redis_client.setex(
-            f"flow:{flow_id}",
-            86400, 
-            json.dumps(flow_data)
-        )
+        redis_client.set(f"flow:{flow_id}",json.dumps(data))
+
+        print(f"Received nodes: {nodes}")
+        print(f"Received edges: {edges}")
+
         return jsonify({
-            "status": "success",
-            "flow_id": flow_id,
-            "message": "Flow saved successfully"
-        }) 
-        
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        'message': 'Flow data received successfully',
+        'flow_id': flow_id 
+        }), 200
+
     
 
-@app.route('/api/load-flow/<flow_id>', methods=['GET'])
-def load_flow(flow_id):
-    try:
-        flow_data = redis_client.get(f"flow:{flow_id}")
-        if not flow_data:
-            return jsonify({"error": "Flow not found"}), 404
+# @app.route('/api/load-flow/<flow_id>', methods=['GET'])
+# def load_flow(flow_id):
+#     try:
+#         flow_data = redis_client.get(f"flow:{flow_id}")
+#         if not flow_data:
+#             return jsonify({"error": "Flow not found"}), 404
             
-        return jsonify(json.loads(flow_data))
+#         return jsonify(json.loads(flow_data))
         
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+#     except Exception as e:
+#         return jsonify({
+#             "status": "error",
+#             "message": str(e)
+#         }), 500
 
-
-@app.route('/ping')
-def ping():
-    return jsonify({
-        'message': 'Pong!', 
-        'server': 'Flask',
-        'time': datetime.datetime.now().isoformat()
-    })
 
 @app.route('/reset/<device_id>', methods=['POST'])
 def reset(device_id):
