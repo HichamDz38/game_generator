@@ -14,6 +14,7 @@ import axios from 'axios';
 import Sidebar from './sidebar';
 import './style.css';
 
+var statett = "Hello"; 
 
 const initialNodes = [
   {
@@ -84,19 +85,25 @@ const DnDFlow = () => {
     }
   }, [rfInstance]);
  const saveFlowToBackend = async () => {
-   try {
-     const response = await axios.post('/api/save-flow', {
-       nodes,
-       edges
-     });
+  
+  // try {
+    let data = {
+       "nodes" : nodes,
+        "edges":edges,
+        "name" : "HELLO_NODE"
+      };
+    //  data = JSON.stringify(data);
+     const response = await axios.post('/api/save_flow', data);
     
-     console.log('Flow saved with ID:', response.data.flow_id);
+     console.log('Flow saved with ID:', "HElllo");
+     console.log(response);
+     console.log(response.data);
      alert(`Flow saved! ID: ${response.data.flow_id}`);
     
-   } catch (error) {
-     console.error('Full error:', error.response?.data);
-     alert(`Save failed: ${error.response?.data?.message || error.message}`);
-   }
+  //  } catch (error) {
+  //    console.error('Full error:', error.response?.data);
+  //    alert(`Save failed: ${error.response?.data?.message || error.message}`);
+  //  }
  };
   const loadFlowfrombackend = async (flowId) => {
    try {
@@ -147,7 +154,6 @@ const DnDFlow = () => {
         <button className="xy-theme__button" onClick={onRestore}>
           restore
         </button>
-
         <button class="backend"
          onClick={saveFlowToBackend}
          style={{
