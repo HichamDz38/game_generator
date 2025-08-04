@@ -1,7 +1,7 @@
 .navbar {  
   display: flex;  
   justify-content: flex-end;  
-  background-color: gray;
+  background-color: #aa80ff;
   }
 .links a {  
   color: white;  
