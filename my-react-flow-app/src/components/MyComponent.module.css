@@ -1,6 +1,6 @@
 .navbar {  
   display: flex;  
-  justify-content: flex-end;  
+  justify-content: flex-end; 
   background-color: #aa80ff;
   }
 .links a {  
@@ -15,14 +15,14 @@
 }
 
 .sidenav {
-  height: 90%; 
-  width: 50rem; 
+  height: 100%; 
+  width: 40rem; 
   position: fixed; 
   z-index: 1; 
   left: 0;
-  background-color: #111; 
+  background-color: #eee6ff;; 
   overflow-x: hidden;
-  top: 5%;
+  top: 6%;
 }
 
 .sidenav a {
@@ -36,4 +36,48 @@
 /* When you mouse over the navigation links, change their color */
 .sidenav a:hover {
   color: #f1f1f1;
+}
+
+.button {
+  background-color: #04AA6D; 
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin-top: 5% ;
+  margin-left: 30%;
+}
+.title {
+  margin-left: 20%;
+}
+
+.secondtitle {
+  margin-left: 5%;
+  margin-top: 10%;
+}
+
+.scenariosbox {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 80%;
+  margin-left: 7%;
+  height: 20px;
+  padding: 1rem; 
+  border: 1px solid #ccc; 
+  border-radius: 8px;      
+  background-color: #f9f9f9; 
+}
+
+.name_scenario {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 0.5rem;
 }
