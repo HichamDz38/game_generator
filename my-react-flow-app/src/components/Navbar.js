@@ -1,37 +1,36 @@
-import React, { useState } from 'react';
-import './styles/styles.css'; 
+import React from 'react';
+//import Container from 'react-bootstrap/Container';
+//import Nav from 'react-bootstrap/Nav';
+//import Navbar from 'react-bootstrap/Navbar';
+//import styled from 'styled-components';
+//import { Background } from 'reactflow';
+import styles from './MyComponent.module.css';
 
-function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
+// const stylednavbar = styled.p`
+//       background-color: red;
+//       height: 80px;
+//       display: flex;
+//       justify-content: center;
+//       align-items: center;
+//       font-size: 1.2rem;
+//       position: sticky;
+//       top: 0;
+//       z-index: 999;
+//     `;
 
-  const toggleMenu = () => {
-    setMenuOpen(!menuOpen);
-  };
-
+function Navbarr() {
   return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        <h1 className="navbar-logo">Welcome</h1>
-        <div className="menu-toggle" onClick={toggleMenu}>
-          &#9776;
-        </div>
-        <ul className={`nav-menu ${menuOpen ? 'active' : ''}`}>
-          <li className="nav-item">
-            <a href="#" className="nav-links">PROPS</a>
-          </li>
-          <li className="nav-item">
-            <a href="#" className="nav-links">SOUND</a>
-          </li>
-          <li className="nav-item">
-            <a href="#" className="nav-links">SETTINGS</a>
-          </li>
-          <li className="nav-item">
-            <a href="#" className="nav-links">EXIT</a>
-          </li>
+    <>
+      <nav className={styles.navbar}>
+        <p className={styles.left}>ERPanel</p>
+        <ul className={styles.links}>
+          <a href="#home">Home</a>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
         </ul>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }
 
-export default Navbar;
+export default Navbarr;
