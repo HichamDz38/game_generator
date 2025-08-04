@@ -3,11 +3,10 @@
     display: flex;
     flex-grow: 1;
     position: absolute;
-    padding: 20rem;
-    height: 50%;
-    width : 50%;
+    margin-left: 35%;
+    height: 100%;
+    width : 60%;
   }
-
 .navbar {
     position: absolute;
     padding: 10rem;

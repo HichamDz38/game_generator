@@ -9,11 +9,11 @@ export default function App() {
     <div className="app">
       <Navbar />
       <Sidenav />
-      {/* <div className="main-content">
+      <div className="main-content">
         <ReactFlowProvider>
           <DnDFlow />
         </ReactFlowProvider>
-      </div> */}
+      </div>
     </div>
   );
 }

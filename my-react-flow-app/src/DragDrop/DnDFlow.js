@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import styles from './MyComponent.module.css';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -7,7 +8,8 @@ import ReactFlow, {
   Controls,
   Background,
   useReactFlow,
-  Panel
+  Panel,
+  BackgroundVariant
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import axios from 'axios'; 
@@ -154,34 +156,21 @@ const DnDFlow = () => {
         <button className="xy-theme__button" onClick={onRestore}>
           restore
         </button>
-        <button class="backend"
+        <button className={styles.savebtn}
          onClick={saveFlowToBackend}
          style={{
-        position: 'absolute',
-        top: '10px',
-        right: '1300px',
-        padding: '8px 16px',
-        background: '#1b154dff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        zIndex: 1000,
-        border: '2px solid red', 
-        fontSize: '20px'
+        
         }}>
           SendTobackend
         </button>
-        <div style={{ position: 'absolute', top: '-5px', right: '1080px', zIndex: 1000 }}>
+        <div>
         <input 
           type="text" 
           placeholder="Paste Flow ID" 
           id="flowIdInput"
-          style={{ marginRight: '10px', padding: '5px' }}
         />
-        <button 
+        <button className={styles.loadbtn}
           onClick={() => loadFlowfrombackend(document.getElementById('flowIdInput').value)}
-          style={{ padding: '5px 10px', background: '#1b154dff', color: 'white' }}
         >
           Load Flow
         </button>
@@ -203,7 +192,12 @@ const DnDFlow = () => {
             onDragOver={(event) => event.preventDefault()}
             fitView
           >
-            <Background />
+            <Background 
+              id="my-background" 
+              gap={15} 
+              color="#hhh" 
+              variant={BackgroundVariant.Dots} 
+            />
             <Controls />
           </ReactFlow>
         </div>
