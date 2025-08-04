@@ -3,9 +3,9 @@
     display: flex;
     flex-grow: 1;
     position: absolute;
-    margin-left: 35%;
+    margin-left: 20%;
     height: 100%;
-    width : 60%;
+    width : 64%;
   }
 .navbar {
     position: absolute;
@@ -24,15 +24,16 @@
   }
   
   .dndflow .dndnode {
-    height: 20px;
+    height: 35px;
     padding: 4px;
     border: 1px solid #1a192b;
-    border-radius: 2px;
+    border-radius: 4px;
     margin-bottom: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: grab;
+    font-size: 20px;
   }
   
   .dndflow .dndnode.input {

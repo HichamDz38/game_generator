@@ -101,11 +101,6 @@ const DnDFlow = () => {
      console.log(response);
      console.log(response.data);
      alert(`Flow saved! ID: ${response.data.flow_id}`);
-    
-  //  } catch (error) {
-  //    console.error('Full error:', error.response?.data);
-  //    alert(`Save failed: ${error.response?.data?.message || error.message}`);
-  //  }
  };
   const loadFlowfrombackend = async (flowId) => {
    try {
@@ -157,17 +152,15 @@ const DnDFlow = () => {
           restore
         </button>
         <button className={styles.savebtn}
-         onClick={saveFlowToBackend}
-         style={{
-        
-        }}>
-          SendTobackend
+         onClick={saveFlowToBackend}>
+          Saveflow
         </button>
         <div>
         <input 
           type="text" 
           placeholder="Paste Flow ID" 
           id="flowIdInput"
+          className={styles.plcinput}
         />
         <button className={styles.loadbtn}
           onClick={() => loadFlowfrombackend(document.getElementById('flowIdInput').value)}

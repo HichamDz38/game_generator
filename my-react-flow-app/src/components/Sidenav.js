@@ -8,7 +8,7 @@ function Sidenav() {
     <>
     <div className={styles.sidenav}>
         <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
-        <button className={styles.button}>CREATE NEW SCENARIO</button>
+        <button>CREATE NEW SCENARIO</button>
         <h2 className={styles.secondtitle}>LISTE OF SCENARIOS :</h2>
         <div className={styles.scenariosbox}>
           <p className={styles.name_scenario}>DEVICE ONE</p>
