@@ -24,9 +24,10 @@ function Navbarr() {
       <nav className={styles.navbar}>
         <p className={styles.left}>ERPanel</p>
         <ul className={styles.links}>
-          <a href="#home">Home</a>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#home">PROPS</a>
+          <a href="#features">SOUND</a>
+          <a href="#pricing">SETTINGS</a>
+          <a href="#pricing">EXIT</a>
         </ul>
       </nav>
     </>
