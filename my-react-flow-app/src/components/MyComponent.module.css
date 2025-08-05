@@ -38,8 +38,8 @@
   color: #f1f1f1;
 }
 
-.button {
-  background-color: #04AA6D; 
+.create_button {
+  background-color: #aa80ff; 
   border: none;
   color: white;
   padding: 15px 32px;
@@ -50,6 +50,15 @@
   margin-top: 5% ;
   margin-left: 30%;
 }
+
+.create_button:hover {
+  background-color: #0056b3;
+}
+
+.create_button:active {
+  background-color: #003f80;
+}
+
 .title {
   margin-left: 20%;
 }
@@ -60,9 +69,10 @@
 }
 
 .scenariosbox {
-  display: flex;
-  justify-content: space-between;
+  /* display: flex;
+  justify-content: space-between;  
   align-items: center;
+  gap: 10px;  */
   width: 80%;
   margin-left: 7%;
   height: 20px;
@@ -75,9 +85,10 @@
 .name_scenario {
   font-weight: bold;
   font-size: 1rem;
+  text-align: center;
 }
 
-.buttonGroup {
+/* .buttonGroup {
   display: flex;
   gap: 0.5rem;
-}
+} */

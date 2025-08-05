@@ -34,7 +34,7 @@ const getId = () => `dndnode_${id++}`;
 
 const flowKey = 'example-flow';
 
-const DnDFlow = () => {
+const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -88,45 +88,57 @@ const DnDFlow = () => {
     }
   }, [rfInstance]);
  const saveFlowToBackend = async () => {
-  SC_Name = prompt("Enter the name of scenario : ");
-  // try {
-    let data = {
-       "nodes" : nodes,
-        "edges":edges,
-        "name" : SC_Name
+    const SC_Name = prompt("Enter the name of scenario: ");
+    if (!SC_Name) return;
+    
+    try {
+      let data = {
+        "nodes": nodes,
+        "edges": edges,
+        "name": SC_Name
       };
-    //  data = JSON.stringify(data);
-    const response = await axios.post('/save_flow', data);
-    
-    console.log('Flow saved with ID:', response.data.flow_id);
-
-    alert(`Flow saved! Name: ${SC_Name}`);
-    console.log(response);
-    console.log(response.data);
- };
+      
+      const response = await axios.post('/save_flow', data);
+      console.log('Flow saved with ID:', response.data.flow_id);
+      alert(`Flow saved! Name: ${SC_Name}`);
+      
+      if (onScenarioSaved) {
+        onScenarioSaved();
+      }
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      alert('Failed to save flow');
+    }
+  };
   const loadFlowfrombackend = async (flowId) => {
-   try {
-     const response = await axios.get(`/load-flow/${flowId}`);
-    
-     if (response.data.error) {
-       throw new Error(response.data.error);
-     }
-    
-     setNodes(response.data.nodes || []);
-     setEdges(response.data.edges || []);
-    
-     if (response.data.viewport && rfInstance) {
-       rfInstance.setViewport(response.data.viewport);
-     }
-    
-     alert('Flow loaded successfully!');
-   } catch (error) {
-     console.error('Load error details:', error.response?.data);
-     alert(`Failed to load flow: ${error.response?.data?.error || 
+    try {
+      const response = await axios.get(`/load-flow/${flowId}`);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+      
+      setNodes(response.data.nodes || []);
+      setEdges(response.data.edges || []);
+      
+      if (response.data.viewport && rfInstance) {
+        rfInstance.setViewport(response.data.viewport);
+      }
+      
+      alert('Flow loaded successfully!');
+    } catch (error) {
+      console.error('Load error details:', error.response?.data);
+      alert(`Failed to load flow: ${error.response?.data?.error || 
             error.response?.data?.message || 
             error.message}`);
-   }
- };
+    }
+  };
+
+  useEffect(() => {
+    if (scenarioToLoad) {
+      loadFlowfrombackend(scenarioToLoad);
+    }
+  }, [scenarioToLoad]);
  
   const onRestore = useCallback(() => {
     const restoreFlow = async () => {
@@ -146,9 +158,13 @@ const DnDFlow = () => {
   return (
     <div className="dndflow">
       <Panel position="top-right">
-        <button className={styles.theme__button} onClick={saveFlowToBackend}>
-          SAVE FLOW
-        </button>
+        <div className={styles.flowButtons}>
+          <button className={styles.theme__button} onClick={saveFlowToBackend}>
+            SAVE
+          </button>
+            <button className={styles.theme__button} /*</div>onClick={() => handleEdit(scenario)}*/>EDIT</button>
+            <button className={styles.theme__button} /*onClick={() => handleDelete(scenario)}*/>DELETE</button>
+        </div>
     {/*
         <button className="xy-theme__button" onClick={onRestore}>
           restore
