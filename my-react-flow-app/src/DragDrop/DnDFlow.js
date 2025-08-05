@@ -92,10 +92,10 @@ const DnDFlow = () => {
     let data = {
        "nodes" : nodes,
         "edges":edges,
-        "name" : "HELLO_NODE"
+        "name" : "NODE_"
       };
     //  data = JSON.stringify(data);
-     const response = await axios.post('/api/save_flow', data);
+     const response = await axios.post('/save_flow', data);
     
      console.log('Flow saved with ID:', "HElllo");
      console.log(response);
@@ -104,7 +104,7 @@ const DnDFlow = () => {
  };
   const loadFlowfrombackend = async (flowId) => {
    try {
-     const response = await axios.get(`/api/load-flow/${flowId}`);
+     const response = await axios.get(`/load-flow/${flowId}`);
     
      if (response.data.error) {
        throw new Error(response.data.error);

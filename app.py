@@ -8,7 +8,8 @@ import uuid
 
 redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
 
-# redis_client = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
+
 
 
 app = Flask(__name__)
@@ -33,7 +34,7 @@ def get_devices():
     connected_dev = redis_client.get("connected_devices")
     return json.dumps(connected_dev)
 
-@app.route('/api/save_flow', methods=['POST'])
+@app.route('/save_flow', methods=['POST'])
 def save_flow():
     flow_data = request.get_json()
     flow_name = flow_data["name"]
@@ -42,19 +43,29 @@ def save_flow():
         return jsonify({'message': 'No data provided'}), 400
 
     print(flow_data)
-    redis_client.set(f"scenarios[{flow_name}]",json.dumps(flow_data))
+    redis_client.set(f"scenario_{flow_name}",json.dumps(flow_data))
+    redis_client.lpush("scenarios_list", flow_name)
+    scenarios = redis_client.get(f"scenarios_{flow_name}")
+    print(scenarios)
 
     return jsonify({
     'message': 'Flow data received successfully2',
     'flow_id': flow_name 
     }), 200
 
-    
 
-@app.route('/api/load-flow/<flow_id>', methods=['GET'])
+@app.route('/flow_scenarios', methods=['GET'])
+def get_scenarios():
+    try:
+        return redis_client.lrange(f"scenarios_list", 0, -1)
+    except:
+        pass
+
+
+@app.route('/load-flow/<flow_id>', methods=['GET'])
 def load_flow(flow_id):
     try:
-        flow_data = redis_client.get(f"scenarios[{flow_id}]")
+        flow_data = redis_client.get(f"scenario_{flow_id}")
         if not flow_data:
             return jsonify({"error": "Flow not found"}), 404
             
