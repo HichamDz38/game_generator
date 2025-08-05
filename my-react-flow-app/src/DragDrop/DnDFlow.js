@@ -42,6 +42,7 @@ const DnDFlow = () => {
   const [editValue, setEditValue] = useState(nodes.data);
   const [id, setId] = useState();
   const { setViewport } = useReactFlow();
+  let SC_Name;
 
   const onNodeClick = (e, val) => {
     setEditValue(val.data.label);
@@ -87,20 +88,21 @@ const DnDFlow = () => {
     }
   }, [rfInstance]);
  const saveFlowToBackend = async () => {
-  
+  SC_Name = prompt("Enter the name of scenario : ");
   // try {
     let data = {
        "nodes" : nodes,
         "edges":edges,
-        "name" : "NODE_"
+        "name" : SC_Name
       };
     //  data = JSON.stringify(data);
-     const response = await axios.post('/save_flow', data);
+    const response = await axios.post('/save_flow', data);
     
-     console.log('Flow saved with ID:', "HElllo");
-     console.log(response);
-     console.log(response.data);
-     alert(`Flow saved! ID: ${response.data.flow_id}`);
+    console.log('Flow saved with ID:', response.data.flow_id);
+
+    alert(`Flow saved! Name: ${SC_Name}`);
+    console.log(response);
+    console.log(response.data);
  };
   const loadFlowfrombackend = async (flowId) => {
    try {

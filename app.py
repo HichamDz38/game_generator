@@ -42,11 +42,11 @@ def save_flow():
     if not flow_data:
         return jsonify({'message': 'No data provided'}), 400
 
-    print(flow_data)
+
     redis_client.set(f"scenario_{flow_name}",json.dumps(flow_data))
-    redis_client.lpush("scenarios_list", flow_name)
-    scenarios = redis_client.get(f"scenarios_{flow_name}")
-    print(scenarios)
+    previous_scenario = redis_client.lrange("scenarios_list", 0, -1)
+    if flow_name not in previous_scenario:
+        redis_client.lpush("scenarios_list", flow_name)
 
     return jsonify({
     'message': 'Flow data received successfully2',
@@ -57,7 +57,7 @@ def save_flow():
 @app.route('/flow_scenarios', methods=['GET'])
 def get_scenarios():
     try:
-        return redis_client.lrange(f"scenarios_list", 0, -1)
+        return list(set(redis_client.lrange(f"scenarios_list", 0, -1)))
     except:
         pass
 
