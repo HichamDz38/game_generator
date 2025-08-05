@@ -146,14 +146,14 @@ const DnDFlow = () => {
   return (
     <div className="dndflow">
       <Panel position="top-right">
-        <button className="xy-theme__button" onClick={onSave}>
-          save
+        <button className={styles.theme__button} onClick={saveFlowToBackend}>
+          SAVE FLOW
         </button>
-
+    {/*
         <button className="xy-theme__button" onClick={onRestore}>
           restore
         </button>
-        <button className={styles.savebtn}
+         <button className={styles.savebtn}
          onClick={saveFlowToBackend}>
           Saveflow
         </button>
@@ -168,8 +168,8 @@ const DnDFlow = () => {
           onClick={() => loadFlowfrombackend(document.getElementById('flowIdInput').value)}
         >
           Load Flow
-        </button>
-        </div>
+        </button> 
+        </div>*/}
         
       </Panel>
 
@@ -192,7 +192,7 @@ const DnDFlow = () => {
               gap={15} 
               color="#hhh" 
               variant={BackgroundVariant.Dots} 
-            />
+            />  
             <Controls />
           </ReactFlow>
         </div>
