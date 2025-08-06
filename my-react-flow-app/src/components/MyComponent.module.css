@@ -43,7 +43,6 @@
   display: block;
 }
 
-/* When you mouse over the navigation links, change their color */
 .sidenav a:hover {
   color: #f1f1f1;
 }
@@ -56,9 +55,9 @@
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
-  margin-top: 5% ;
-  margin-left: 30%;
+  font-size: 25px;
+  margin-top: 1% ;
+  margin-left: 38%;
 }
 
 .create_button:hover {
@@ -70,12 +69,14 @@
 }
 
 .title {
-  margin-left: 20%;
+  margin-left: 36%;
+  font-size: 40px;
 }
 
 .secondtitle {
-  margin-left: 5%;
-  margin-top: 10%;
+  margin-left: 40%;
+  font-size: 30px;
+  margin-top: 3%;
 }
 
 .scenariosbox {
