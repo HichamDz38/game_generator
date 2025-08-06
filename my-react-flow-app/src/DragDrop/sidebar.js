@@ -60,7 +60,7 @@ function Sidebar({ onLoadScenario }) {
               onDragStart={(event) => onDragStart(event, 'device', `Device: ${deviceId}`)}
               draggable
             >
-              {deviceId} - {deviceData.status || 'Unknown'}
+              {deviceData.device_name} 
             </div>
           ))
         ) : (
