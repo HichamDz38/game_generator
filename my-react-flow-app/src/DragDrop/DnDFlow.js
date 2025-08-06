@@ -80,31 +80,51 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     };
 
     setNodes((nds) => nds.concat(newNode));
-    axios.post('/node-created', newNode).catch(console.error);
   }, [rfInstance]);
 
   const saveFlowToBackend = async () => {
-    const SC_Name = prompt("Enter the name of scenario: ");
-    if (!SC_Name) return;
-    
-    try {
-      let data = {
-        "nodes": nodes,
-        "edges": edges,
-        "name": SC_Name
-      };
-      
-      const response = await axios.post('/save_flow', data);
-      console.log('Flow saved with ID:', response.data.flow_id);
-      alert(`Flow saved! Name: ${SC_Name}`);
-      setCurrentScenarioName(SC_Name);
-      
-      if (onScenarioSaved) {
-        onScenarioSaved();
+    if (currentScenarioName) {
+      try {
+        let data = {
+          "nodes": nodes,
+          "edges": edges,
+          "name": currentScenarioName
+        };
+        
+        const response = await axios.post('/save_flow', data);
+        console.log('Flow updated:', response.data.flow_id);
+        alert(`Scenario "${currentScenarioName}" updated successfully!`);
+        
+        if (onScenarioSaved) {
+          onScenarioSaved();
+        }
+      } catch (error) {
+        console.error('Error saving flow:', error);
+        alert('Failed to update scenario');
       }
-    } catch (error) {
-      console.error('Error saving flow:', error);
-      alert('Failed to save flow');
+    } else {
+      const SC_Name = prompt("Enter the name of scenario: ");
+      if (!SC_Name) return;
+      
+      try {
+        let data = {
+          "nodes": nodes,
+          "edges": edges,
+          "name": SC_Name
+        };
+        
+        const response = await axios.post('/save_flow', data);
+        console.log('Flow saved with ID:', response.data.flow_id);
+        alert(`Flow saved! Name: ${SC_Name}`);
+        setCurrentScenarioName(SC_Name);
+        
+        if (onScenarioSaved) {
+          onScenarioSaved();
+        }
+      } catch (error) {
+        console.error('Error saving flow:', error);
+        alert('Failed to save flow');
+      }
     }
   };
 
@@ -174,7 +194,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             SAVE AS
           </button>
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
-            SAVE
+            {currentScenarioName ? 'UPDATE' : 'SAVE'}
           </button>
           <button className={styles.theme__button} >
             EDIT
