@@ -85,3 +85,20 @@
   font-family: bold;
   text-align: center;
 }
+
+.titledev {
+  font-size: 20px;
+  font-family: bold;
+  text-align: center;
+}
+
+.sidenav {
+  height: 100%; 
+  width: 40rem; 
+  position: fixed; 
+  z-index: 1; 
+  left: 0;
+  background-color: #eee6ff; 
+  overflow-x: hidden;
+  top: 6%;
+}

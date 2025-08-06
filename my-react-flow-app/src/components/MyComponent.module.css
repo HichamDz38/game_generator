@@ -13,17 +13,6 @@
 .navbar .left {
   margin-right: 72%;
 }
-
-.sidenav {
-  height: 100%; 
-  width: 40rem; 
-  position: fixed; 
-  z-index: 1; 
-  left: 0;
-  background-color: #eee6ff; 
-  overflow-x: hidden;
-  top: 6%;
-}
 .Scenariopp {
   height: 100%; 
   width: 100%; 

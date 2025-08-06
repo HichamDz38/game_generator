@@ -49,8 +49,8 @@ function Sidebar({ onLoadScenario }) {
           Group Node
         </div>
       </div> */}
-      <div className="section">
-        <h3>Connected Devices</h3>
+      <div className={styles.sidenav}>
+        <h3 className={styles.titledev}>Connected Devices</h3>
         <div className="description">Drag devices to create device nodes.</div>
         {Object.keys(devices).length > 0 ? (
           Object.entries(devices).map(([deviceId, deviceData]) => (
