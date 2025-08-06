@@ -14,7 +14,7 @@ export default function App() {
 
   const handleScenarioSaved = () => {
     setRefreshScenarios(prev => !prev);
-    setSelectedScenario(null); // Clear selection after save
+    setSelectedScenario(null); 
   };
 
   return (
