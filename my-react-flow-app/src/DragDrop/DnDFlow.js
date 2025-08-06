@@ -200,7 +200,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             SAVE AS
           </button>
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
-            {currentScenarioName ? 'UPDATE' : 'SAVE'}
+            SAVE
           </button>
           <button className={styles.theme__button} >
             EDIT
