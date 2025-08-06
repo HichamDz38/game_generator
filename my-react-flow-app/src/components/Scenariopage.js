@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
+import ThreeDotsButtonWithIcon from './ThreeDotsButtonWithIcon';
 
 function Scenariopage({ onScenarioSelect, onCreateNew }) {  
   const [scenarios, setScenarios] = useState([]);
@@ -43,6 +44,7 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
   return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
+      <ThreeDotsButtonWithIcon />
       <button 
         className={styles.create_button}
         onClick={handleCreateNew}
