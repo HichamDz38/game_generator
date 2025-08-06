@@ -176,6 +176,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     <div className="dndflow">
       <Panel position="top-right">
         <div className={styles.flowButtons}>
+          <button className={styles.theme__button} >
+            SAVE AS
+          </button>
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
             SAVE
           </button>
