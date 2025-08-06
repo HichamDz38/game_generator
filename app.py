@@ -31,8 +31,15 @@ def index():
 
 @app.route('/get_devices', methods=['GET'])
 def get_devices():
-    connected_dev = redis_client.get("connected_devices")
-    return json.dumps(connected_dev)
+    try:
+        connected_dev = redis_client.get("connected_devices")
+        if connected_dev:
+            return connected_dev
+        else:
+            return json.dumps({})
+    except Exception as e:
+        print(f"Error getting devices: {e}")
+        return json.dumps({})
 
 @app.route('/save_flow', methods=['POST'])
 def save_flow():

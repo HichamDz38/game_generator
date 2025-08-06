@@ -16,8 +16,6 @@ import axios from 'axios';
 import Sidebar from './sidebar';
 import './style.css';
 
-var statett = "Hello"; 
-
 const initialNodes = [
   {
     id: '1',
@@ -39,29 +37,30 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState(null);
-  const [editValue, setEditValue] = useState(nodes.data);
-  const [id, setId] = useState();
+  const [editValue, setEditValue] = useState('');
+  const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [currentScenarioName, setCurrentScenarioName] = useState('');
   const { setViewport } = useReactFlow();
-  let SC_Name;
 
   const onNodeClick = (e, val) => {
     setEditValue(val.data.label);
-    setId(val.id);
+    setSelectedNodeId(val.id);
     axios.post('/node-clicked', { 
       nodeId: val.id,
       nodeType: val.type 
     }).catch(console.error);
   };
 
-   const onConnect = useCallback((params) => {
-     setEdges((eds) => addEdge(params, eds));
-     axios.post('/connection-made', params).catch(console.error);
-   }, []);
+  const onConnect = useCallback((params) => {
+    setEdges((eds) => addEdge(params, eds));
+    axios.post('/connection-made', params).catch(console.error);
+  }, []);
 
   const onDrop = useCallback((event) => {
     event.preventDefault();
     const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
     const type = event.dataTransfer.getData('application/reactflow');
+    const label = event.dataTransfer.getData('application/label');
 
     if (typeof type === 'undefined' || !type) return;
 
@@ -72,22 +71,19 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     
     const newNode = {
       id: getId(),
-      type,
+      type: type === 'device' ? 'default' : type, 
       position,
-      data: { label: `${type} node` },
+      data: { 
+        label: label || `${type} node`,
+        deviceType: type === 'device' ? 'device' : type
+      },
     };
 
     setNodes((nds) => nds.concat(newNode));
     axios.post('/node-created', newNode).catch(console.error);
   }, [rfInstance]);
 
-  const onSave = useCallback(() => {
-    if (rfInstance) {
-      const flow = rfInstance.toObject();
-      localStorage.setItem(flowKey, JSON.stringify(flow));
-    }
-  }, [rfInstance]);
- const saveFlowToBackend = async () => {
+  const saveFlowToBackend = async () => {
     const SC_Name = prompt("Enter the name of scenario: ");
     if (!SC_Name) return;
     
@@ -101,6 +97,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       const response = await axios.post('/save_flow', data);
       console.log('Flow saved with ID:', response.data.flow_id);
       alert(`Flow saved! Name: ${SC_Name}`);
+      setCurrentScenarioName(SC_Name);
       
       if (onScenarioSaved) {
         onScenarioSaved();
@@ -110,7 +107,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       alert('Failed to save flow');
     }
   };
-  const loadFlowfrombackend = async (flowId) => {
+
+  const loadFlowFromBackend = async (flowId) => {
     try {
       const response = await axios.get(`/load-flow/${flowId}`);
       
@@ -120,6 +118,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       
       setNodes(response.data.nodes || []);
       setEdges(response.data.edges || []);
+      setCurrentScenarioName(flowId);
       
       if (response.data.viewport && rfInstance) {
         rfInstance.setViewport(response.data.viewport);
@@ -134,26 +133,44 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
+  const deleteCurrentScenario = async () => {
+    if (!currentScenarioName) {
+      alert('No scenario loaded to delete');
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete scenario "${currentScenarioName}"?`)) {
+      try {
+        await axios.delete(`/delete_scenario/${currentScenarioName}`);
+        alert('Scenario deleted successfully');
+        setCurrentScenarioName('');
+        setNodes([]);
+        setEdges([]);
+        if (onScenarioSaved) {
+          onScenarioSaved();
+        }
+      } catch (error) {
+        console.error('Error deleting scenario:', error);
+        alert('Failed to delete scenario');
+      }
+    }
+  };
+
+  const clearFlow = () => {
+    setNodes([]);
+    setEdges([]);
+    setCurrentScenarioName('');
+  };
+
+  const handleLoadScenario = (scenarioName) => {
+    loadFlowFromBackend(scenarioName);
+  };
+
   useEffect(() => {
     if (scenarioToLoad) {
-      loadFlowfrombackend(scenarioToLoad);
+      loadFlowFromBackend(scenarioToLoad);
     }
   }, [scenarioToLoad]);
- 
-  const onRestore = useCallback(() => {
-    const restoreFlow = async () => {
-      const flow = JSON.parse(localStorage.getItem(flowKey));
- 
-      if (flow) {
-        const { x = 0, y = 0, zoom = 1 } = flow.viewport;
-        setNodes(flow.nodes || []);
-        setEdges(flow.edges || []);
-        setViewport({ x, y, zoom });
-      }
-    };
- 
-    restoreFlow();
-  }, [setNodes, setViewport]);
 
   return (
     <div className="dndflow">
@@ -162,31 +179,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
             SAVE
           </button>
-            <button className={styles.theme__button} /*</div>onClick={() => handleEdit(scenario)}*/>EDIT</button>
-            <button className={styles.theme__button} /*onClick={() => handleDelete(scenario)}*/>DELETE</button>
+          <button className={styles.theme__button} onClick={clearFlow}>
+            NEW
+          </button>
+          <button className={styles.theme__button} onClick={deleteCurrentScenario}>
+            DELETE
+          </button>
         </div>
-    {/*
-        <button className="xy-theme__button" onClick={onRestore}>
-          restore
-        </button>
-         <button className={styles.savebtn}
-         onClick={saveFlowToBackend}>
-          Saveflow
-        </button>
-        <div>
-        <input 
-          type="text" 
-          placeholder="Paste Flow ID" 
-          id="flowIdInput"
-          className={styles.plcinput}
-        />
-        <button className={styles.loadbtn}
-          onClick={() => loadFlowfrombackend(document.getElementById('flowIdInput').value)}
-        >
-          Load Flow
-        </button> 
-        </div>*/}
-        
+        {currentScenarioName && (
+          <div className="current-scenario">
+            Current: {currentScenarioName}
+          </div>
+        )}
       </Panel>
 
       <ReactFlowProvider>
@@ -206,13 +210,13 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             <Background 
               id="my-background" 
               gap={15} 
-              color="#hhh" 
+              color="#ccc" 
               variant={BackgroundVariant.Dots} 
             />  
             <Controls />
           </ReactFlow>
         </div>
-        <Sidebar />
+        <Sidebar onLoadScenario={handleLoadScenario} />
       </ReactFlowProvider>
     </div>
   );
