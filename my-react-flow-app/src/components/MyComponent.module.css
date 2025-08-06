@@ -24,6 +24,16 @@
   overflow-x: hidden;
   top: 6%;
 }
+.Scenariopp {
+  height: 100%; 
+  width: 100%; 
+  position: fixed; 
+  z-index: 1; 
+  left: 0;
+  background-color: #eee6ff; 
+  overflow-x: hidden;
+  top: 6%;
+}
 
 .sidenav a {
   padding: 6px 8px 6px 16px;

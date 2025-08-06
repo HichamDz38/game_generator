@@ -3,6 +3,7 @@ import { ReactFlowProvider } from 'reactflow';
 import DnDFlow from './DragDrop/DnDFlow';
 import Navbar from './components/Navbar';
 import Sidenav from './components/Sidenav';
+import Scenariopage from './components/Scenariopage';
 
 export default function App() {
   const [refreshScenarios, setRefreshScenarios] = useState(false);
@@ -21,18 +22,18 @@ export default function App() {
     <div className="app">
       <Navbar />
       <div style={{ display: 'flex' }}>
-        <Sidenav 
+        <Scenariopage
           onScenarioSelect={handleScenarioSelect} 
           key={refreshScenarios}
         />
-        <div className="main-content">
+        {/* <div className="main-content">
           <ReactFlowProvider>
             <DnDFlow 
               scenarioToLoad={selectedScenario}
               onScenarioSaved={handleScenarioSaved}
             />
           </ReactFlowProvider>
-        </div>
+        </div> */}
       </div>
     </div>
   );
