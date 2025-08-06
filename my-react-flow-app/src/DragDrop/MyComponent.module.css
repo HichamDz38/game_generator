@@ -87,6 +87,12 @@
 }
 
 .titledev {
+  font-size: 30px;
+  font-family: bold;
+  text-align: center;
+}
+
+.titledev2 {
   font-size: 20px;
   font-family: bold;
   text-align: center;
@@ -94,7 +100,7 @@
 
 .sidenav {
   height: 100%; 
-  width: 40rem; 
+  width: 30rem; 
   position: fixed; 
   z-index: 1; 
   left: 0;

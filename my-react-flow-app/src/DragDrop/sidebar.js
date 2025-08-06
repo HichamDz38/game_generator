@@ -51,7 +51,8 @@ function Sidebar({ onLoadScenario }) {
       </div> */}
       <div className={styles.sidenav}>
         <h3 className={styles.titledev}>Connected Devices</h3>
-        <div className="description">Drag devices to create device nodes.</div>
+        <div className={styles.titledev2}>Drag devices to create Scenario</div>
+        <br></br><br></br>
         {Object.keys(devices).length > 0 ? (
           Object.entries(devices).map(([deviceId, deviceData]) => (
             <div
