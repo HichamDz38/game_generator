@@ -133,3 +133,32 @@ label{
   margin: 0;
   padding: 0;
 }
+
+.dndnode {
+  padding: 12px 16px;
+  margin: 8px 0;
+  background: #fff;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: grab;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.dndnode:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.dndnode:active {
+  cursor: grabbing;
+  transform: translateY(0);
+}
+
+.dndnode.device {
+  border-color: #6610f2;
+  background: linear-gradient(135deg, #e2d9f3, #d1c7e8);
+}

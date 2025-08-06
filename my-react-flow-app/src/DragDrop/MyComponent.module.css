@@ -108,3 +108,15 @@
   overflow-x: hidden;
   top: 6%;
 }
+
+.scenarionnamebox {
+  height: 25px;
+  font-size: 18px;
+  background-color: black;
+  color: white;
+  text-align: center;
+  margin-top: 8%;
+  border-radius: 8px;
+}
+
+

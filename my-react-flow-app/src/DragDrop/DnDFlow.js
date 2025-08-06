@@ -133,16 +133,16 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const deleteCurrentScenario = async () => {
+  const deleteScenario = async () => {
     if (!currentScenarioName) {
-      alert('No scenario loaded to delete');
+      alert('No scenario ');
       return;
     }
 
-    if (window.confirm(`Are you sure you want to delete scenario "${currentScenarioName}"?`)) {
+    if (window.confirm(`Are you sure "${currentScenarioName}"?`)) {
       try {
         await axios.delete(`/delete_scenario/${currentScenarioName}`);
-        alert('Scenario deleted successfully');
+        alert('Scenario deleted ');
         setCurrentScenarioName('');
         setNodes([]);
         setEdges([]);
@@ -150,8 +150,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           onScenarioSaved();
         }
       } catch (error) {
-        console.error('Error deleting scenario:', error);
-        alert('Failed to delete scenario');
+        console.error('Error deleting :', error);
+        alert('Failed to delete ');
       }
     }
   };
@@ -179,16 +179,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
             SAVE
           </button>
-          <button className={styles.theme__button} onClick={clearFlow}>
-            NEW
+          <button className={styles.theme__button} >
+            EDIT
           </button>
-          <button className={styles.theme__button} onClick={deleteCurrentScenario}>
+          <button className={styles.theme__button} onClick={deleteScenario}>
             DELETE
           </button>
         </div>
         {currentScenarioName && (
-          <div className="current-scenario">
-            Current: {currentScenarioName}
+          <div className= {styles.scenarionnamebox}>
+            <div className={styles.scenarionname}>
+              scenario name: {currentScenarioName}
+            </div>
           </div>
         )}
       </Panel>

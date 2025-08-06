@@ -40,6 +40,19 @@ def get_devices():
     except Exception as e:
         print(f"Error getting devices: {e}")
         return json.dumps({})
+    
+@app.route('/delete_scenario/<scenario_name>', methods=['DELETE'])
+def delete_scenario(scenario_name):
+    flow_data = redis_client.get(f"scenario_{scenario_name}")
+    if not flow_data:
+        return jsonify({"error": "Scenario not found"}), 404
+    redis_client.delete(f"scenario_{scenario_name}")
+    redis_client.lrem("scenarios_list", 0, scenario_name)
+ 
+    return jsonify({
+        "message": "Scenario deleted "
+    }), 200
+
 
 @app.route('/save_flow', methods=['POST'])
 def save_flow():
