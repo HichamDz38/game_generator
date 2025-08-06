@@ -23,6 +23,12 @@ const initialNodes = [
     data: { label: 'input node' },
     position: { x: 250, y: 5 },
   },
+  {
+    id: '2',
+    type: 'output',
+    data: { label: 'output node' },
+    position: { x: 250, y: 200 },
+  },
 ];
 
 const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
