@@ -156,12 +156,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const clearFlow = () => {
-    setNodes([]);
-    setEdges([]);
-    setCurrentScenarioName('');
-  };
-
   const handleLoadScenario = (scenarioName) => {
     loadFlowFromBackend(scenarioName);
   };

@@ -14,6 +14,11 @@ export default function App() {
     setShowFlowEditor(true); 
   };
 
+  const handleCreateNew = () => {
+    setSelectedScenario(null); 
+    setShowFlowEditor(true);
+  };
+
   const handleScenarioSaved = () => {
     setRefreshScenarios(prev => !prev);
     setSelectedScenario(null);
@@ -32,13 +37,14 @@ export default function App() {
         {!showFlowEditor ? (
           <Scenariopage
             onScenarioSelect={handleScenarioSelect} 
+            onCreateNew={handleCreateNew}
             key={refreshScenarios}
           />
         ) : (
           <div className="main-content">
             <ReactFlowProvider>
               <DnDFlow 
-                scenarioToLoad={selectedScenario}
+                scenarioToLoad={selectedScenario} 
                 onScenarioSaved={handleScenarioSaved}
                 onBackToList={handleBackToList}
               />

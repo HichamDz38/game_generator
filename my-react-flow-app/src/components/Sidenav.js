@@ -42,10 +42,16 @@ function Sidenav({ onScenarioSelect }) {
     }
   };
 
+  const clearFlow = () => {
+    setNodes([]);
+    setEdges([]);
+    setCurrentScenarioName('');
+  };
+
   return (
     <div className={styles.sidenav}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
-      <button className={styles.create_button}>CREATE NEW SCENARIO</button>
+      <button className={styles.create_button} onClick={clearFlow}>CREATE NEW SCENARIO</button>
       <h2 className={styles.secondtitle}>LIST OF SCENARIOS:</h2>
       
       {loading ? (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 
-function Scenariopage({ onScenarioSelect }) {  
+function Scenariopage({ onScenarioSelect, onCreateNew }) {  
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,24 +28,27 @@ function Scenariopage({ onScenarioSelect }) {
     fetchScenarios();
   }, []); 
 
-  // const handleEdit = (scenarioName) => {
-  //   console.log('Edit scenario:', scenarioName);
-  // };
-
-  // const handleDelete = (scenarioName) => {
-  //   console.log('Delete scenario:', scenarioName);
-  // };
-
   const handleScenarioClick = (scenarioName) => {
     if (onScenarioSelect) {
       onScenarioSelect(scenarioName);
+    }
+  };
+  
+  const handleCreateNew = () => {
+    if (onCreateNew) {
+      onCreateNew();
     }
   };
 
   return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
-      <button className={styles.create_button}>CREATE NEW SCENARIO</button>
+      <button 
+        className={styles.create_button}
+        onClick={handleCreateNew}
+      >
+        CREATE NEW SCENARIO
+      </button>
       <h2 className={styles.secondtitle}>LIST OF SCENARIOS:</h2>
       
       {loading ? (
@@ -58,7 +61,7 @@ function Scenariopage({ onScenarioSelect }) {
             <div 
               key={index} 
               className={styles.scenariosbox}
-              onClick={() => onScenarioSelect(scenario)}
+              onClick={() => handleScenarioClick(scenario)}
               style={{ marginBottom: '10px', cursor: 'pointer' }}  
             >
               <p className={styles.name_scenario}>{scenario}</p>
