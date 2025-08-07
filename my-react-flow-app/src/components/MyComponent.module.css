@@ -69,10 +69,10 @@
 }
 
 .scenariosbox {
-  /* display: flex;
+  display: flex;
   justify-content: space-between;  
   align-items: center;
-  gap: 10px;  */
+  gap: 10px;  
   width: 40%;
   margin-left: 28%;
   height: 20px;
@@ -88,7 +88,8 @@
   text-align: center;
 }
 
-/* .buttonGroup {
+.buttongroupe {
   display: flex;
+  justify-content: flex-end; 
   gap: 0.5rem;
-} */
+}

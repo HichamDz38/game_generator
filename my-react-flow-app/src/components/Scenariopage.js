@@ -67,6 +67,12 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
               style={{ marginBottom: '10px', cursor: 'pointer' }}  
             >
               <p className={styles.name_scenario}>{scenario}</p>
+              <div className={styles.buttongroupe}>
+                <button onClick={handleCreateNew}>rename</button>
+                <button>copy</button>
+                <button>delete</button>
+              </div>
+
             </div>
           ))}
         </div>
