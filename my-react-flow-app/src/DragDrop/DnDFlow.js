@@ -152,15 +152,37 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const handledeleteScenario = () => {
-    deleteScenario(
-      currentScenarioName,
-      setCurrentScenarioName,
-      setNodes,
-      setEdges,
-      onScenarioSaved
-    )
-  }
+  const handleSaveAs = async () => {
+    const newScenarioName = prompt("Enter a new name for this scenario:");
+    
+    if (!newScenarioName) {
+      return; 
+    }
+
+    if (!newScenarioName) {
+      return;
+    }
+
+    try {
+      const data = {
+        nodes: nodes,
+        edges: edges,
+        name: SC_Name
+      };
+
+      const response = await axios.post('/save_flow', data);
+      
+      if (response.status === 200) {
+        setCurrentScenarioName(newScenarioName);
+        
+        if (onScenarioSaved) {
+          onScenarioSaved(); 
+        }
+      }
+    } catch (error) {
+      console.error('Error saving scenario:', error);
+    }
+  };
 
   const handleLoadScenario = (scenarioName) => {
     loadFlowFromBackend(scenarioName);
@@ -176,7 +198,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     <div className="dndflow">
       <Panel position="top-right">
         <div className={styles.flowButtons}>
-          <button className={styles.theme__button} >
+          <button className={styles.theme__button} onClick={handleSaveAs}>
             SAVE AS
           </button>
           <button className={styles.theme__button} onClick={saveFlowToBackend}>

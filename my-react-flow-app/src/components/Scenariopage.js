@@ -74,7 +74,7 @@ const startRenaming = (scenarioName, e) => {
   const handleRenameSubmit = async (oldName, e) => {
     e.stopPropagation();
     try {
-      if (!newScenarioName.trim()) {
+      if (!newScenarioName) {
         return;
       }
 
@@ -110,7 +110,7 @@ const startRenaming = (scenarioName, e) => {
   const handleCopySubmit = async (originalName, e) => {
     e.stopPropagation();
     try {
-      if (!copyName.trim()) {
+      if (!copyName) {
         return;
       }
 
@@ -135,14 +135,10 @@ const startRenaming = (scenarioName, e) => {
   return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
-      <button 
-        className={styles.create_button}
-        onClick={handleCreateNew}
-      >
+      <button className={styles.create_button} onClick={handleCreateNew}>
         CREATE NEW SCENARIO
       </button>
       <h2 className={styles.secondtitle}>LIST OF SCENARIOS:</h2>
-      
       {loading ? (
         <p>Loading scenarios...</p>
       ) : error ? (

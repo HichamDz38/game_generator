@@ -78,7 +78,7 @@ def copy_scenario(original_name, new_name):
     redis_client.set(f"scenario_{new_name}", flow_data)    
     redis_client.lpush("scenarios_list", new_name)    
     return jsonify({
-        "message": "Scenario copied successfully",
+        "message": "Scenario copied successfully",  
         "new_name": new_name
     }), 200
 
