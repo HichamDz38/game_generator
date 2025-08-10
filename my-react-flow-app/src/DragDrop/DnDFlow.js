@@ -185,7 +185,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   };
 
   const handleLoadScenario = (scenarioName) => {
-    loadFlowFromBackend(scenarioName);
+    loadFlowFromBackend(scenarioName)
   };
 
   useEffect(() => {
@@ -228,14 +228,12 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodeClick={onNodeClick}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setRfInstance}
-            onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            fitView
+            odesDraggable={false}
+            nodesConnectable={false}
+            edgesUpdatable={false}
+            elementsSelectable={false}
+            nodesDeletable={false}
+            edgesDeletable={false}
           >
             <Background 
               id="my-background" 
