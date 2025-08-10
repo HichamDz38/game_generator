@@ -48,6 +48,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [currentScenarioName, setCurrentScenarioName] = useState('');
   const { setViewport } = useReactFlow();
+  const [isEditable, setIsEditable] = useState(false);
 
   const onNodeClick = (e, val) => {
     setEditValue(val.data.label);
@@ -188,6 +189,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     loadFlowFromBackend(scenarioName)
   };
 
+  const handleEditScenario = (scenarioName) => {
+    <ReactFlow
+    onNodeClick={onNodeClick}
+    onNodesChange={onNodesChange}
+    onEdgesChange={onEdgesChange}
+    onConnect={onConnect}
+    onInit={setRfInstance}
+    onDrop={onDrop}
+    fitView >
+    </ReactFlow>
+  };
+
   useEffect(() => {
     if (scenarioToLoad) {
       loadFlowFromBackend(scenarioToLoad);
@@ -207,8 +220,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <button className={styles.theme__button} onClick={saveFlowToBackend}>
             SAVE
           </button>
-          <button className={styles.theme__button} >
-            EDIT
+           
+          <button className={styles.theme__button} onClick={() => setIsEditable((prev) => !prev)}>
+          {isEditable ? 'Save' : 'Edit'}
           </button>
           <button className={styles.theme__button} onClick={deleteScenario}>
             DELETE
@@ -228,12 +242,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            odesDraggable={false}
-            nodesConnectable={false}
-            edgesUpdatable={false}
-            elementsSelectable={false}
-            nodesDeletable={false}
-            edgesDeletable={false}
+             onNodesChange={onNodesChange}
+             onEdgesChange={onEdgesChange}
+             onConnect={onConnect}
+             nodesDraggable={isEditable}
+             nodesConnectable={isEditable}
+             elementsSelectable={isEditable}
+             edgesUpdatable={isEditable}
+             edgesFocusable={isEditable}
+             nodesFocusable={isEditable}
+             panOnDrag={isEditable}
+             zoomOnDoubleClick={isEditable}
+             fitView
           >
             <Background 
               id="my-background" 
