@@ -56,22 +56,31 @@ def delete_scenario(scenario_name):
 
 @app.route('/rename_scenario/<old_name>/<new_name>', methods=['PUT'])
 def rename_scenario(old_name, new_name):
-    try:
-        flow_data = redis_client.get(f"scenario_{old_name}")
-        if not flow_data:
-            return jsonify({"error": "Scenario not found"}), 404
+    flow_data = redis_client.get(f"scenario_{old_name}")
+    if not flow_data:
+        return jsonify({"error": "Scenario not found"}), 404
+    if redis_client.exists(f"scenario_{new_name}"):
+        return jsonify({"error": "Scenario with this name already exists"}), 400 
+    redis_client.rename(f"scenario_{old_name}", f"scenario_{new_name}")    
+    redis_client.lrem("scenarios_list", 0, old_name)
+    redis_client.lpush("scenarios_list", new_name)
         
-        if redis_client.exists(f"scenario_{new_name}"):
-            return jsonify({"error": "Scenario with this name already exists"}), 400
-        
-        redis_client.rename(f"scenario_{old_name}", f"scenario_{new_name}")
-        
-        redis_client.lrem("scenarios_list", 0, old_name)
-        redis_client.lpush("scenarios_list", new_name)
-        
-        return jsonify({"message": "Scenario renamed successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"message": "Scenario renamed successfully"}), 200
+    
+@app.route('/copy_scenario/<original_name>/<new_name>', methods=['POST'])
+def copy_scenario(original_name, new_name):
+
+    flow_data = redis_client.get(f"scenario_{original_name}")
+    if not flow_data:
+        return jsonify({"error": "scenario not found"}), 404
+    if redis_client.exists(f"scenario_{new_name}"):
+        return jsonify({"error": "name already exists"}), 400
+    redis_client.set(f"scenario_{new_name}", flow_data)    
+    redis_client.lpush("scenarios_list", new_name)    
+    return jsonify({
+        "message": "Scenario copied successfully",
+        "new_name": new_name
+    }), 200
 
 
 @app.route('/save_flow', methods=['POST'])

@@ -8,6 +8,8 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
   const [error, setError] = useState(null);
   const [editingScenario, setEditingScenario] = useState(null);
   const [newScenarioName, setNewScenarioName] = useState('');
+  const [copyingScenario, setCopyingScenario] = useState(null);
+  const [copyName, setCopyName] = useState('');
 
   const fetchScenarios = async () => {
     setLoading(true);
@@ -93,8 +95,44 @@ const startRenaming = (scenarioName, e) => {
     e.stopPropagation();
     setEditingScenario(null);
   };
+  var id = 0;
+   const startCopying = (scenarioName, e) => {
+    id++;
+    e.stopPropagation();
+    setCopyingScenario(scenarioName);
+    setCopyName(`${scenarioName}_${id}`);
+  };
 
-   return (
+  const handleCopyNameChange = (e) => {
+    setCopyName(e.target.value);
+  };
+
+  const handleCopySubmit = async (originalName, e) => {
+    e.stopPropagation();
+    try {
+      if (!copyName.trim()) {
+        return;
+      }
+
+      const response = await axios.post(
+        `http://localhost:5000/copy_scenario/${originalName}/${copyName}`
+      );
+      
+      if (response.status === 200) {
+        setCopyingScenario(null);
+        fetchScenarios();
+      }
+    } catch (error) {
+      console.error('Error copying scenario:', error);
+    }
+  };
+
+  const cancelCopy = (e) => {
+    e.stopPropagation();
+    setCopyingScenario(null);
+  };
+
+  return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
       <button 
@@ -120,43 +158,25 @@ const startRenaming = (scenarioName, e) => {
             >
               {editingScenario === scenario ? (
                 <div className={styles.renameContainer}>
-                  <input
-                    type="text"
-                    value={newScenarioName}
-                    onChange={handleRenameChange}
-                    className={styles.renameInput}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <button 
-                    className={styles.saveRename}
-                    onClick={(e) => handleRenameSubmit(scenario, e)}
-                  >
-                    Save
-                  </button>
-                  <button 
-                    className={styles.cancelRename}
-                    onClick={cancelRename}
-                  >
-                    Cancel
-                  </button>
+                  <input type="text" value={newScenarioName} onChange={handleRenameChange}
+                    className={styles.renameInput} onClick={(e) => e.stopPropagation()}/>
+                  <button className={styles.saveRename} onClick={(e) => handleRenameSubmit(scenario, e)}>Save</button>
+                  <button className={styles.cancelRename}onClick={cancelRename}>Cancel</button>
+                </div>
+              ) : copyingScenario === scenario ? (
+                <div className={styles.copyContainer}>
+                  <input type="text" value={copyName} onChange={handleCopyNameChange}
+                    className={styles.copyInput} onClick={(e) => e.stopPropagation()}/>
+                  <button className={styles.saveCopy} onClick={(e) => handleCopySubmit(scenario, e)}>Copy</button>
+                  <button className={styles.cancelCopy} onClick={cancelCopy} >Cancel</button>
                 </div>
               ) : (
                 <>
                   <p className={styles.name_scenario}>{scenario}</p>
                   <div className={styles.buttongroupe}>
-                    <button 
-                      className={styles.rename} 
-                      onClick={(e) => startRenaming(scenario, e)}
-                    >
-                      rename
-                    </button>
-                    <button className={styles.copy}>copy</button>
-                    <button 
-                      className={styles.delete} 
-                      onClick={(e) => handleDelete(scenario, e)}
-                    >
-                      delete
-                    </button>
+                    <button className={styles.rename} onClick={(e) => startRenaming(scenario, e)}>rename</button>
+                    <button className={styles.copy} onClick={(e) => startCopying(scenario, e)}>copy</button>
+                    <button className={styles.delete} onClick={(e) => handleDelete(scenario, e)}>delete</button>
                   </div>
                 </>
               )}
