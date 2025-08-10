@@ -43,15 +43,18 @@ def get_devices():
     
 @app.route('/delete_scenario/<scenario_name>', methods=['DELETE'])
 def delete_scenario(scenario_name):
+    if not scenario_name or scenario_name == 'undefined':
+        return jsonify({"error": "Invalid scenario name"}), 400
+        
     flow_data = redis_client.get(f"scenario_{scenario_name}")
     if not flow_data:
         return jsonify({"error": "Scenario not found"}), 404
+        
     redis_client.delete(f"scenario_{scenario_name}")
     redis_client.lrem("scenarios_list", 0, scenario_name)
- 
-    return jsonify({
-        "message": "Scenario deleted "
-    }), 200
+    return jsonify({"message": "Scenario deleted"}), 200
+
+
 
 
 @app.route('/save_flow', methods=['POST'])

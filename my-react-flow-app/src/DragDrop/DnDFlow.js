@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import styles from './MyComponent.module.css';
+import { deleteScenario } from '../components/deleteScenario';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -151,25 +152,15 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const deleteScenario = async () => {
-    if (!currentScenarioName) {
-      return;
-    }
-
-    if (window.confirm(`Are you sure "${currentScenarioName}"?`)) {
-      try {
-        await axios.delete(`/delete_scenario/${currentScenarioName}`);
-        setCurrentScenarioName('');
-        setNodes([]);
-        setEdges([]);
-        if (onScenarioSaved) {
-          onScenarioSaved();
-        }
-      } catch (error) {
-        console.error('Error deleting :', error);
-      }
-    }
-  };
+  const handledeleteScenario = () => {
+    deleteScenario(
+      currentScenarioName,
+      setCurrentScenarioName,
+      setNodes,
+      setEdges,
+      onScenarioSaved
+    )
+  }
 
   const handleLoadScenario = (scenarioName) => {
     loadFlowFromBackend(scenarioName);

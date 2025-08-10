@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
-import ThreeDotsButtonWithIcon from './ThreeDotsButtonWithIcon';
+import axios from 'axios';
 
-function Scenariopage({ onScenarioSelect, onCreateNew }) {  
+function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {  
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [editingScenario, setEditingScenario] = useState(null);
+  const [newScenarioName, setNewScenarioName] = useState('');
 
   const fetchScenarios = async () => {
     setLoading(true);
@@ -40,8 +42,59 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
       onCreateNew();
     }
   };
+  
+  const onScenarioDeleted = () => {
+  fetchScenarios();
+};
 
-  return (
+  const handleDelete = async (scenarioName, e) => {
+  e.stopPropagation(); 
+  try {
+    const response = await axios.delete(`http://localhost:5000/delete_scenario/${scenarioName}`);
+    if (response.status === 200) {
+      onScenarioDeleted(); 
+    }
+  } catch (error) {
+    console.error('Error deleting ', error);
+  }
+};
+
+const startRenaming = (scenarioName, e) => {
+    e.stopPropagation();
+    setEditingScenario(scenarioName);
+    setNewScenarioName(scenarioName);
+  };
+
+  const handleRenameChange = (e) => {
+    setNewScenarioName(e.target.value);
+  };
+
+  const handleRenameSubmit = async (oldName, e) => {
+    e.stopPropagation();
+    try {
+      if (!newScenarioName.trim()) {
+        return;
+      }
+
+      const response = await axios.put(
+        `http://localhost:5000/rename_scenario/${oldName}/${newScenarioName}`
+      );
+      
+      if (response.status === 200) {
+        setEditingScenario(null);
+        fetchScenarios();
+      }
+    } catch (error) {
+      console.error('Error renaming scenario:', error);
+    }
+  };
+
+  const cancelRename = (e) => {
+    e.stopPropagation();
+    setEditingScenario(null);
+  };
+
+   return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
       <button 
@@ -65,13 +118,48 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
               onClick={() => handleScenarioClick(scenario)}
               style={{ marginBottom: '10px', cursor: 'pointer' }}  
             >
-              <p className={styles.name_scenario}>{scenario}</p>
-              <div className={styles.buttongroupe}>
-                <button className={styles.rename}>rename</button>
-                <button className={styles.copy}>copy</button>
-                <button className={styles.delete}>delete</button>
-              </div>
-
+              {editingScenario === scenario ? (
+                <div className={styles.renameContainer}>
+                  <input
+                    type="text"
+                    value={newScenarioName}
+                    onChange={handleRenameChange}
+                    className={styles.renameInput}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button 
+                    className={styles.saveRename}
+                    onClick={(e) => handleRenameSubmit(scenario, e)}
+                  >
+                    Save
+                  </button>
+                  <button 
+                    className={styles.cancelRename}
+                    onClick={cancelRename}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className={styles.name_scenario}>{scenario}</p>
+                  <div className={styles.buttongroupe}>
+                    <button 
+                      className={styles.rename} 
+                      onClick={(e) => startRenaming(scenario, e)}
+                    >
+                      rename
+                    </button>
+                    <button className={styles.copy}>copy</button>
+                    <button 
+                      className={styles.delete} 
+                      onClick={(e) => handleDelete(scenario, e)}
+                    >
+                      delete
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
