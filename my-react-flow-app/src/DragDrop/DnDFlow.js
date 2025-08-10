@@ -198,6 +198,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     <div className="dndflow">
       <Panel position="top-right">
         <div className={styles.flowButtons}>
+          <button className={styles.theme__button}>
+            START
+          </button>
           <button className={styles.theme__button} onClick={handleSaveAs}>
             SAVE AS
           </button>
