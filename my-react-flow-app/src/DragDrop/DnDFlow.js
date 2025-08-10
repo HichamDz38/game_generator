@@ -99,14 +99,12 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         
         const response = await axios.post('/save_flow', data);
         console.log('Flow updated:', response.data.flow_id);
-        alert(`Scenario "${currentScenarioName}" updated successfully!`);
         
         if (onScenarioSaved) {
           onScenarioSaved();
         }
       } catch (error) {
         console.error('Error saving flow:', error);
-        alert('Failed to update scenario');
       }
     } else {
       const SC_Name = prompt("Enter the name of scenario: ");
@@ -121,7 +119,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         
         const response = await axios.post('/save_flow', data);
         console.log('Flow saved with ID:', response.data.flow_id);
-        alert(`Flow saved! Name: ${SC_Name}`);
         setCurrentScenarioName(SC_Name);
         
         if (onScenarioSaved) {
@@ -129,7 +126,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         }
       } catch (error) {
         console.error('Error saving flow:', error);
-        alert('Failed to save flow');
       }
     }
   };
@@ -150,25 +146,19 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         rfInstance.setViewport(response.data.viewport);
       }
       
-      alert('Flow loaded successfully!');
     } catch (error) {
       console.error('Load error details:', error.response?.data);
-      alert(`Failed to load flow: ${error.response?.data?.error || 
-            error.response?.data?.message || 
-            error.message}`);
     }
   };
 
   const deleteScenario = async () => {
     if (!currentScenarioName) {
-      alert('No scenario ');
       return;
     }
 
     if (window.confirm(`Are you sure "${currentScenarioName}"?`)) {
       try {
         await axios.delete(`/delete_scenario/${currentScenarioName}`);
-        alert('Scenario deleted ');
         setCurrentScenarioName('');
         setNodes([]);
         setEdges([]);
@@ -177,7 +167,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         }
       } catch (error) {
         console.error('Error deleting :', error);
-        alert('Failed to delete ');
       }
     }
   };

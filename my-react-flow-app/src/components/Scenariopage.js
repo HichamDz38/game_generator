@@ -44,7 +44,6 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
   return (
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
-      <ThreeDotsButtonWithIcon />
       <button 
         className={styles.create_button}
         onClick={handleCreateNew}
@@ -68,9 +67,9 @@ function Scenariopage({ onScenarioSelect, onCreateNew }) {
             >
               <p className={styles.name_scenario}>{scenario}</p>
               <div className={styles.buttongroupe}>
-                <button onClick={handleCreateNew}>rename</button>
-                <button>copy</button>
-                <button>delete</button>
+                <button className={styles.rename}>rename</button>
+                <button className={styles.copy}>copy</button>
+                <button className={styles.delete}>delete</button>
               </div>
 
             </div>

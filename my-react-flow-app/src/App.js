@@ -14,6 +14,10 @@ export default function App() {
     setShowFlowEditor(true); 
   };
 
+  const handleReturnScenarioSelect = () => {
+    setShowFlowEditor(false); 
+  };
+
   const handleCreateNew = () => {
     setSelectedScenario(null); 
     setShowFlowEditor(true);
@@ -32,7 +36,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <Navbar />
+      <Navbar 
+        onReturnScenarioSelect={handleReturnScenarioSelect}
+      />
       <div style={{ display: 'flex' }}>
         {!showFlowEditor ? (
           <Scenariopage

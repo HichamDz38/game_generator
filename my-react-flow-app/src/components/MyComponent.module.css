@@ -92,4 +92,42 @@
   display: flex;
   justify-content: flex-end; 
   gap: 0.5rem;
+  color: white
+}
+
+.rename {
+  background: #0015ff;
+  color: white;
+  font-size: 20px;
+  text-transform: lowercase;
+  border-color: #eee6ff;
+  border-radius: 8px;
+}
+.rename:hover {
+      background-color: #002a84; 
+      color: lightgray;
+    }
+.copy {
+  background: #00ff04;
+  color: white;
+  font-size: 20px;
+  text-transform: lowercase;
+  border-color: #eee6ff;
+  border-radius: 8px;
+}
+.copy:hover {
+  background-color: #028e20;
+  color: lightgray; 
+}
+.delete {
+  background: #ff0000;
+  color: white;
+  font-size: 20px;
+  text-transform: lowercase;
+  border-color: #eee6ff;
+  border-radius: 8px;
+}
+.delete:hover {
+  background-color: #9a0000;
+  color: lightgray; 
 }
