@@ -189,17 +189,35 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     loadFlowFromBackend(scenarioName)
   };
 
-  const handleEditScenario = (scenarioName) => {
-    <ReactFlow
-    onNodeClick={onNodeClick}
-    onNodesChange={onNodesChange}
-    onEdgesChange={onEdgesChange}
-    onConnect={onConnect}
-    onInit={setRfInstance}
-    onDrop={onDrop}
-    fitView >
-    </ReactFlow>
-  };
+  const EditableNode = ({ id, data, isEditable, onChange }) => {
+  return (
+    <div>
+      {isEditable ? (
+        <input
+          value={data.label}
+          onChange={(e) => onChange(id, e.target.value)}
+          style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}
+        />
+      ) : (
+        <span>{data.label}</span>
+      )}
+    </div>
+  );
+};
+
+
+
+  // const handleEditScenario = (scenarioName) => {
+  //   <ReactFlow
+  //   onNodeClick={onNodeClick}
+  //   onNodesChange={onNodesChange}
+  //   onEdgesChange={onEdgesChange}
+  //   onConnect={onConnect}
+  //   onInit={setRfInstance}
+  //   onDrop={onDrop}
+  //   fitView >
+  //   </ReactFlow>
+  // };
 
   useEffect(() => {
     if (scenarioToLoad) {
@@ -221,9 +239,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             SAVE
           </button>
            
-          <button className={styles.theme__button} onClick={() => setIsEditable((prev) => !prev)}>
-          {isEditable ? 'Save' : 'Edit'}
+          <button
+            className={styles.theme__button}
+            onClick={() => {
+              if (isEditable) {
+                saveFlowToBackend(); 
+              }
+              setIsEditable((prev) => !prev);
+            }}
+          >
+            {isEditable ? 'Save' : 'Edit'}
           </button>
+
           <button className={styles.theme__button} onClick={deleteScenario}>
             DELETE
           </button>
@@ -242,18 +269,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-             onNodesChange={onNodesChange}
-             onEdgesChange={onEdgesChange}
-             onConnect={onConnect}
-             nodesDraggable={isEditable}
-             nodesConnectable={isEditable}
-             elementsSelectable={isEditable}
-             edgesUpdatable={isEditable}
-             edgesFocusable={isEditable}
-             nodesFocusable={isEditable}
-             panOnDrag={isEditable}
-             zoomOnDoubleClick={isEditable}
-             fitView
+            onNodesChange={onNodesChange}
+            onEdgesChange={!isEditable ? undefined : onEdgesChange}
+            onConnect={!isEditable ? undefined : onConnect}
+            nodesDraggable={isEditable}
+            nodesConnectable={isEditable}
+            elementsSelectable={isEditable}
+            edgesUpdatable={isEditable}
+            edgesFocusable={isEditable}
+            nodesFocusable={isEditable}
+            panOnDrag={isEditable}
+            zoomOnDoubleClick={isEditable}
+            fitView
           >
             <Background 
               id="my-background" 
