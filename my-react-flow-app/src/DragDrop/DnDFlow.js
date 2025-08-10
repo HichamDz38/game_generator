@@ -167,7 +167,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       const data = {
         nodes: nodes,
         edges: edges,
-        name: SC_Name
+        name: newScenarioName
       };
 
       const response = await axios.post('/save_flow', data);
