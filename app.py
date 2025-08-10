@@ -54,7 +54,24 @@ def delete_scenario(scenario_name):
     redis_client.lrem("scenarios_list", 0, scenario_name)
     return jsonify({"message": "Scenario deleted"}), 200
 
-
+@app.route('/rename_scenario/<old_name>/<new_name>', methods=['PUT'])
+def rename_scenario(old_name, new_name):
+    try:
+        flow_data = redis_client.get(f"scenario_{old_name}")
+        if not flow_data:
+            return jsonify({"error": "Scenario not found"}), 404
+        
+        if redis_client.exists(f"scenario_{new_name}"):
+            return jsonify({"error": "Scenario with this name already exists"}), 400
+        
+        redis_client.rename(f"scenario_{old_name}", f"scenario_{new_name}")
+        
+        redis_client.lrem("scenarios_list", 0, old_name)
+        redis_client.lpush("scenarios_list", new_name)
+        
+        return jsonify({"message": "Scenario renamed successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/save_flow', methods=['POST'])
