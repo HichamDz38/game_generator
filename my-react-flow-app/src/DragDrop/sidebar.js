@@ -44,7 +44,7 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
             <div
               key={deviceId}
               className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'device', deviceData.device_name)}
+              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`)}
               draggable
             >
               {deviceData.device_name} - {deviceId}
