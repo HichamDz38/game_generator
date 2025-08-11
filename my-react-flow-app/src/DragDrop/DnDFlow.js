@@ -232,12 +232,25 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <button className={styles.theme__button}>
             START
           </button>
-          <button className={styles.theme__button} onClick={handleSaveAs}>
+          {/* <button className={styles.theme__button} onClick={handleSaveAs}>
             SAVE AS
+          </button> */}
+
+          <button
+            className={styles.theme__button}
+            onClick={() => {
+              if (isEditable) {
+                handleSaveAs(); 
+              }
+              setIsEditable((prev) => !prev);
+            }}
+          >
+            {isEditable ? 'Save as ' : ''}
           </button>
-          <button className={styles.theme__button} onClick={saveFlowToBackend}>
+          
+          {/* <button className={styles.theme__button} onClick={saveFlowToBackend}>
             SAVE
-          </button>
+          </button> */}
            
           <button
             className={styles.theme__button}
