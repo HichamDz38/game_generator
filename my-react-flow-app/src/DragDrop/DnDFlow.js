@@ -53,20 +53,22 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [selectedNode, setSelectedNode] = useState(null);
 
   const onNodeClick = (e, clickedNode) => {
-  console.log('Node clicked:', clickedNode);
+    console.log('Node clicked:', clickedNode);
+    setSelectedNode(clickedNode);
 
-  
+    if (isEditable) {
+      setEditValue(clickedNode.data.label);
+      setSelectedNodeId(clickedNode.id);
+      axios.post('/node-clicked', { 
+        nodeId: clickedNode.id,
+        nodeType: clickedNode.type 
+      }).catch(console.error);
+    }
+  };
 
-  
-  if (isEditable) {
-    setEditValue(clickedNode.data.label);
-    setSelectedNodeId(clickedNode.id);
-    axios.post('/node-clicked', { 
-      nodeId: clickedNode.id,
-      nodeType: clickedNode.type 
-    }).catch(console.error);
+  const closeNodeDetails = () => {
+    setSelectedNode(null);
   }
-};
 
   const onConnect = useCallback((params) => {
     if (isEditable) {
