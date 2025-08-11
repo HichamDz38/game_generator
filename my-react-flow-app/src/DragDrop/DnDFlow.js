@@ -56,6 +56,11 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     console.log('Node clicked:', clickedNode);
     setSelectedNode(clickedNode);
 
+    if (selectedNodeId === clickedNode.id) {
+      closeNodeDetails();
+      return;
+    }
+
     if (isEditable) {
       setEditValue(clickedNode.data.label);
       setSelectedNodeId(clickedNode.id);
