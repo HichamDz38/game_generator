@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import { deleteScenario } from '../components/deleteScenario';
+import NodeDetails from '../components/NodeDetails';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -49,17 +50,23 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [currentScenarioName, setCurrentScenarioName] = useState('');
   const { setViewport } = useReactFlow();
   const [isEditable, setIsEditable] = useState(false);
+  const [selectedNode, setSelectedNode] = useState(null);
 
-  const onNodeClick = (e, val) => {
-    if (isEditable) {
-      setEditValue(val.data.label);
-      setSelectedNodeId(val.id);
-      axios.post('/node-clicked', { 
-        nodeId: val.id,
-        nodeType: val.type 
-      }).catch(console.error);
-    }
-  };
+  const onNodeClick = (e, clickedNode) => {
+  console.log('Node clicked:', clickedNode);
+
+  
+
+  
+  if (isEditable) {
+    setEditValue(clickedNode.data.label);
+    setSelectedNodeId(clickedNode.id);
+    axios.post('/node-clicked', { 
+      nodeId: clickedNode.id,
+      nodeType: clickedNode.type 
+    }).catch(console.error);
+  }
+};
 
   const onConnect = useCallback((params) => {
     if (isEditable) {
@@ -381,6 +388,10 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           </ReactFlow>
         </div>
         <Sidebar onLoadScenario={handleLoadScenario} />
+        <NodeDetails 
+          nodeData={selectedNode} 
+          onClose={closeNodeDetails} 
+        />'
       </ReactFlowProvider>
     </div>
   );

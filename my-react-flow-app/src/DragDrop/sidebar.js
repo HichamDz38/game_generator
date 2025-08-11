@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import './style.css'
 
-function Sidebar({ onLoadScenario }) {
+function Sidebar({ onLoadScenario , onNodeClick}) {
   const [devices, setDevices] = useState({});
 
   const onDragStart = (event, nodeType, label) => {
@@ -31,6 +31,7 @@ function Sidebar({ onLoadScenario }) {
   useEffect(() => {
     fetchDevices();
   }, []);
+
 
   return (
     <aside className="sidebar">
