@@ -115,8 +115,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     if (inputNodes.length === 0 || inputNodes.length > 1) {
       errors.push("Flow must have one input node");
     }
-    if (outputNodes.length === 0) {
-      errors.push("Flow must have at least one output node");
+    if (outputNodes.length === 0 || outputNodes.length > 1) {
+      errors.push("Flow must have one output node");
     }
     
     outputNodes.forEach(outputNode => {
