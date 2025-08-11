@@ -101,7 +101,84 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     setNodes((nds) => nds.concat(newNode));
   }, [rfInstance, isEditable]);
 
+
+   const validateFlow = () => {
+    const errors = [];
+    if (nodes.length === 0) {
+      errors.push("Flow must contain at least one node");
+      return { isValid: false, errors };
+    }
+    
+    const inputNodes = nodes.filter(node => node.type === 'input');
+    const outputNodes = nodes.filter(node => node.type === 'output');
+    
+    if (inputNodes.length === 0) {
+      errors.push("Flow must have at least one input node");
+    }
+    if (outputNodes.length === 0) {
+      errors.push("Flow must have at least one output node");
+    }
+    
+    outputNodes.forEach(outputNode => {
+      const hasIncomingEdge = edges.some(edge => edge.target === outputNode.id);
+      if (!hasIncomingEdge) {
+        errors.push(`Output node must have at least one incoming Edge`);
+      }
+    });
+    inputNodes.forEach(inputNode => {
+      const hasOutgoingEdge = edges.some(edge => edge.source === inputNode.id);
+      if (!hasOutgoingEdge) {
+        errors.push(`Input node should have at least one outgoing Edge`);
+      }
+    });
+    const connectedNodeIds = new Set();
+    edges.forEach(edge => {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    });
+    
+    const isolatedNodes = nodes.filter(node => 
+      !connectedNodeIds.has(node.id) && 
+      node.type !== 'input' && 
+      node.type !== 'output'
+    );
+    
+    if (isolatedNodes.length > 0) {
+      errors.push(`Found a node with no edeges`);
+    }
+    
+    if (inputNodes.length > 0 && outputNodes.length > 0) {
+      const hasValidPath = outputNodes.some(outputNode => {
+        const reachableFromInput = edges.some(edge => 
+          edge.target === outputNode.id || 
+          inputNodes.some(inputNode => edge.source === inputNode.id)
+        );
+        return reachableFromInput;
+      });
+      
+      if (!hasValidPath && edges.length > 0) {
+        errors.push("must have path from input to output nodes");
+      }
+    }
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
   const saveFlowToBackend = async () => {
+
+    const validation = validateFlow();
+    
+    if (!validation.isValid) {
+      const errorMessage = "Cannot save flow due to the following issues:\n\n" + 
+        validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n') +
+        "\n\nPlease fix these issues before saving.";
+      
+      alert(errorMessage);
+      return false; 
+    }
+
     if (currentScenarioName) {
       try {
         let data = {

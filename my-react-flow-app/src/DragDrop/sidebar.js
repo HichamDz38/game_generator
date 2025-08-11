@@ -67,8 +67,13 @@ function Sidebar({ onLoadScenario }) {
           ))
         ) : (
           <div className="no-devices">No devices connected</div>
+          
         )}
+        
+
       </div>
+
+      
 
     </aside>
   );
