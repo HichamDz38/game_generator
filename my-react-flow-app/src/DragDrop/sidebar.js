@@ -35,22 +35,6 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
 
   return (
     <aside className="sidebar">
-     {/* <div className="section">
-        <h3>Node Types</h3>
-        <div className="description">You can drag these nodes to the pane on the right.</div>
-        <div className="dndnode input" onDragStart={(event) => onDragStart(event, 'input', 'Input Node')} draggable>
-          Input Node
-        </div>
-        <div className="dndnode" onDragStart={(event) => onDragStart(event, 'default', 'Default Node')} draggable>
-          Default Node
-        </div> 
-        <div className="dndnode output" onDragStart={(event) => onDragStart(event, 'output', 'Output Node')} draggable>
-          Output Node
-        </div>
-        <div className="dndnode output" onDragStart={(event) => onDragStart(event, 'group', 'Group Node')} draggable>
-          Group Node
-        </div>
-      </div> */}
       <div className={styles.sidenav}>
         <h3 className={styles.titledev}>Connected Devices</h3>
         <div className={styles.titledev2}>Drag devices to create Scenario</div>
@@ -63,7 +47,7 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
               onDragStart={(event) => onDragStart(event, 'device', deviceData.device_name)}
               draggable
             >
-              {deviceData.device_name} 
+              {deviceData.device_name} - {deviceId}
             </div>
           ))
         ) : (
