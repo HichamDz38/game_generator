@@ -51,20 +51,31 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [isEditable, setIsEditable] = useState(false);
 
   const onNodeClick = (e, val) => {
-    setEditValue(val.data.label);
-    setSelectedNodeId(val.id);
-    axios.post('/node-clicked', { 
-      nodeId: val.id,
-      nodeType: val.type 
-    }).catch(console.error);
+    if (isEditable) {
+      setEditValue(val.data.label);
+      setSelectedNodeId(val.id);
+      axios.post('/node-clicked', { 
+        nodeId: val.id,
+        nodeType: val.type 
+      }).catch(console.error);
+    }
   };
 
   const onConnect = useCallback((params) => {
-    setEdges((eds) => addEdge(params, eds));
-    axios.post('/connection-made', params).catch(console.error);
+    if (isEditable) {
+      setEdges((eds) => addEdge(params, eds));
+      axios.post('/connection-made', params).catch(console.error);
+    }
+  }, [isEditable]);
+
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const onDrop = useCallback((event) => {
+    if (!isEditable) return;
+    
     event.preventDefault();
     const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
     const type = event.dataTransfer.getData('application/reactflow');
@@ -88,7 +99,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     };
 
     setNodes((nds) => nds.concat(newNode));
-  }, [rfInstance]);
+  }, [rfInstance, isEditable]);
 
   const saveFlowToBackend = async () => {
     if (currentScenarioName) {
@@ -144,6 +155,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       setEdges(response.data.edges || []);
       setCurrentScenarioName(flowId);
       
+      setIsEditable(false);
+      
       if (response.data.viewport && rfInstance) {
         rfInstance.setViewport(response.data.viewport);
       }
@@ -158,10 +171,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     
     if (!newScenarioName) {
       return; 
-    }
-
-    if (!newScenarioName) {
-      return;
     }
 
     try {
@@ -186,38 +195,44 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   };
 
   const handleLoadScenario = (scenarioName) => {
-    loadFlowFromBackend(scenarioName)
+    loadFlowFromBackend(scenarioName);
   };
 
+  const handleEdit = () => {
+    setIsEditable(true);
+  };
+
+  const handleSave = async () => {
+    await saveFlowToBackend();
+    setIsEditable(false);
+  };
+
+  const handleSaveAsAndStayEditable = async () => {
+    await handleSaveAs();
+  };
+
+  const handledeleteScenario = () => {
+    deleteScenario(
+      currentScenarioName,
+      setCurrentScenarioName,
+      setNodes,
+      setEdges, 
+      onScenarioSaved
+    )
+  }
+
   const EditableNode = ({ id, data, isEditable, onChange }) => {
-  return (
-    <div>
-      {isEditable ? (
-        <input
-          value={data.label}
-          onChange={(e) => onChange(id, e.target.value)}
-          style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}
-        />
-      ) : (
-        <span>{data.label}</span>
-      )}
-    </div>
-  );
-};
-
-
-
-  // const handleEditScenario = (scenarioName) => {
-  //   <ReactFlow
-  //   onNodeClick={onNodeClick}
-  //   onNodesChange={onNodesChange}
-  //   onEdgesChange={onEdgesChange}
-  //   onConnect={onConnect}
-  //   onInit={setRfInstance}
-  //   onDrop={onDrop}
-  //   fitView >
-  //   </ReactFlow>
-  // };
+    return (
+      <div>
+        {isEditable ? (
+          <input value={data.label} onChange={(e) => onChange(id, e.target.value)}
+            style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}/>
+        ) : (
+          <span>{data.label}</span>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (scenarioToLoad) {
@@ -232,44 +247,23 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <button className={styles.theme__button}>
             START
           </button>
-          {/* <button className={styles.theme__button} onClick={handleSaveAs}>
-            SAVE AS
-          </button> */}
 
-          <button
-            className={styles.theme__button}
-            onClick={() => {
-              if (isEditable) {
-                handleSaveAs(); 
-              }
-              setIsEditable((prev) => !prev);
-            }}
-          >
-            {isEditable ? 'Save as ' : ''}
-          </button>
-          
-          {/* <button className={styles.theme__button} onClick={saveFlowToBackend}>
-            SAVE
-          </button> */}
-           
-          <button
-            className={styles.theme__button}
-            onClick={() => {
-              if (isEditable) {
-                saveFlowToBackend(); 
-              }
-              setIsEditable((prev) => !prev);
-            }}
-          >
-            {isEditable ? 'Save' : 'Edit'}
+          {isEditable && (
+            <button className={styles.theme__button} onClick={handleSaveAsAndStayEditable}>
+              SAVE AS
+            </button>
+          )}
+
+          <button className={styles.theme__button} onClick={isEditable ? handleSave : handleEdit}>
+            {isEditable ? 'SAVE' : 'EDIT'}
           </button>
 
-          <button className={styles.theme__button} onClick={deleteScenario}>
+          <button className={styles.theme__button} onClick={handledeleteScenario}>
             DELETE
           </button>
         </div>
         {currentScenarioName && (
-          <div className= {styles.scenarionnamebox}>
+          <div className={styles.scenarionnamebox}>
             <div className={styles.scenarionname}>
               scenario name: {currentScenarioName}
             </div>
@@ -282,17 +276,22 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={!isEditable ? undefined : onEdgesChange}
-            onConnect={!isEditable ? undefined : onConnect}
+            onNodesChange={isEditable ? onNodesChange : undefined}
+            onEdgesChange={isEditable ? onEdgesChange : undefined}
+            onConnect={isEditable ? onConnect : undefined}
+            onNodeClick={onNodeClick}
+            onInit={setRfInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
             nodesDraggable={isEditable}
             nodesConnectable={isEditable}
             elementsSelectable={isEditable}
             edgesUpdatable={isEditable}
             edgesFocusable={isEditable}
             nodesFocusable={isEditable}
-            panOnDrag={isEditable}
-            zoomOnDoubleClick={isEditable}
+            panOnDrag={true}
+            zoomOnDoubleClick={true}
+            selectNodesOnDrag={isEditable}
             fitView
           >
             <Background 
@@ -311,7 +310,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 };
 
 export default DnDFlow;
-
 
 
 
