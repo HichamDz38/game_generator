@@ -69,7 +69,14 @@ function Sidebar({ onLoadScenario }) {
           <div className="no-devices">No devices connected</div>
           
         )}
-        
+        <br></br><br></br>
+        <p className={styles.titledev2}>Static nodes</p>
+        <div className="dndnode device" onDragStart={(event) => onDragStart(event, 'input', 'Input Node')} draggable>
+          Input Node
+        </div>
+        <div className="dndnode device" onDragStart={(event) => onDragStart(event, 'output', 'Output Node')} draggable>
+          Output Node
+        </div>
 
       </div>
 
