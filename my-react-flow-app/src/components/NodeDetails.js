@@ -45,6 +45,9 @@ function NodeDetails({ nodeData, onClose , OnDrop}) {
                         </label>
                     </div>
                 ))}
+                <button className={styles.theme__button} >
+                    Submit
+                </button>
             </div>
         {/* <p><strong>Position:</strong> X: {nodeData.position?.x}, Y: {nodeData.position?.y}</p> */}
         </div>

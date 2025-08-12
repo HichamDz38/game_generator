@@ -254,6 +254,21 @@
   margin: 8px 0;
 }
 
+.theme__button {
+  background: #eee6ff;
+  color: black;
+  font-size: 20px;
+  text-transform: lowercase;
+  border-color: #eee6ff;
+  border-radius: 8px;
+  margin-left: 38%;
+  margin-top: 10%;
+}
+
+select {
+  margin-top: 10%;
+}
+
 .closeButton {
   background: none;
   border: none;
