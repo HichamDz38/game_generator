@@ -227,7 +227,7 @@ def device_config():
             'config':[
                 {
                     'name': "num_players",
-                    'type' : 'int'
+                    'type' : 'number'
                 },
                 {
                     'name': "message",
