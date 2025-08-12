@@ -145,6 +145,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         errors.push(`Input node should have at least one outgoing Edge`);
       }
     });
+    
+
     const connectedNodeIds = new Set();
     edges.forEach(edge => {
       connectedNodeIds.add(edge.source);
@@ -156,12 +158,27 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       node.type !== 'input' && 
       node.type !== 'output'
     );
+
+    const NormalNodes = nodes.filter(node => 
+      connectedNodeIds.has(node.id) && 
+      node.type !== 'input' && 
+      node.type !== 'output'
+    )
+
+    NormalNodes.forEach(NormalNodes => {
+      const hasIncomingEdge = edges.some(edge => edge.target === NormalNodes.id);
+      const hasOutgoingEdge = edges.some(edge => edge.source === NormalNodes.id);
+      if (!hasIncomingEdge || !hasOutgoingEdge) {
+        errors.push(`each node must have two edges`);
+        return ;
+      }
+    });
     
     if (isolatedNodes.length > 0) {
       errors.push(`Found a node with no edeges`);
     }
     
-    if (inputNodes.length > 0 && outputNodes.length > 0) {
+    if (inputNodes.length > 0 && outputNodes.length> 0) {
       const hasValidPath = outputNodes.some(outputNode => {
         const reachableFromInput = edges.some(edge => 
           edge.target === outputNode.id || 
