@@ -41,6 +41,40 @@ def get_devices():
         print(f"Error getting devices: {e}")
         return json.dumps({})
     
+@app.route('/node_configiration', methods=['POST'])
+def node_configiration():
+    try:
+        data = request.get_json()
+        node_id = data['nodeId']
+        config = data['config']
+        scenarios = redis_client.lrange("scenarios_list", 0, -1)
+        
+        for scenario_name in scenarios:
+            flow_data = redis_client.get(f"scenario_{scenario_name}")
+            if flow_data:
+                flow = json.loads(flow_data)
+                for node in flow.get('nodes', []):
+                    if node['id'] == node_id:
+                        if 'data' not in node:
+                            node['data'] = {}
+                        node['data']['config_values'] = config
+                        redis_client.set(f"scenario_{scenario_name}", json.dumps(flow))
+                        return jsonify({
+                            "status": "success",
+                            "message": "Node configuration updated"
+                        })
+        
+        return jsonify({
+            "status": "error",
+            "message": "Node not found in any scenario"
+        }), 404
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    
 @app.route('/delete_scenario/<scenario_name>', methods=['DELETE'])
 def delete_scenario(scenario_name):
     if not scenario_name or scenario_name == 'undefined':

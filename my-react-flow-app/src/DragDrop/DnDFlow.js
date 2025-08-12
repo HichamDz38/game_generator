@@ -420,7 +420,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         <NodeDetails 
           nodeData={selectedNode} 
           onClose={closeNodeDetails} 
-        />'
+        />
       </ReactFlowProvider>
     </div>
   );
