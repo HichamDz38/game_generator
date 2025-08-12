@@ -211,7 +211,7 @@ def device_config():
             'config':[
                 {
                     'name': "speed",
-                    'type' : 'int'
+                    'type' : 'number'
                 },
                 {
                     'name': "direction",

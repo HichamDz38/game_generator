@@ -7,8 +7,6 @@ function NodeDetails({ nodeData, onClose }) {
   
   if (!nodeData) return null;
 
-  var i=1;
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!containerRef.current) {
