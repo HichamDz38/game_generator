@@ -335,10 +335,12 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     <div className="dndflow">
       <Panel position="top-right">
         <div className={styles.flowButtons}>
-          <button className={styles.theme__button}>
-            START
-          </button>
-
+          {!isEditable && (
+            <button className={styles.theme__button}>
+              START
+            </button>
+          )}
+          
           {isEditable && (
             <button className={styles.theme__button} onClick={handleSaveAsAndStayEditable}>
               SAVE AS
