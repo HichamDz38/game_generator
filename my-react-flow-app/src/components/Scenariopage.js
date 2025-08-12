@@ -75,7 +75,12 @@ const startRenaming = (scenarioName, e) => {
     e.stopPropagation();
     try {
       if (!newScenarioName) {
+        alert("write a name");
         return;
+      }
+
+      if (newScenarioName === oldName) {
+        alert("this name is already exist");
       }
 
       const response = await axios.put(
@@ -111,6 +116,7 @@ const startRenaming = (scenarioName, e) => {
     e.stopPropagation();
     try {
       if (!copyName) {
+        alert("The name is already taken");
         return;
       }
 
