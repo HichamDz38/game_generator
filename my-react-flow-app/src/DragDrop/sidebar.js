@@ -5,10 +5,12 @@ import './style.css'
 function Sidebar({ onLoadScenario , onNodeClick}) {
   const [devices, setDevices] = useState({});
 
-  const onDragStart = (event, nodeType, label) => {
+  const onDragStart = (event, nodeType, label, config) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.setData('application/label', label);
+    event.dataTransfer.setData('application/config', JSON.stringify(config));
     event.dataTransfer.effectAllowed = 'move';
+    console.log(config);
   };
 
   const fetchDevices = async () => {
@@ -44,7 +46,7 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
             <div
               key={deviceId}
               className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`)}
+              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`, deviceData.config)}
               draggable
             >
               {deviceData.device_name} - {deviceId}

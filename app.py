@@ -167,41 +167,43 @@ def reset_all():
 
 
 @app.route('/set_random_devices', methods=['GET'])
-def save_flow():
+def device_config():
     
     devices_list = {
         '127.0.0.1:34914': {
             'device_name': 'Device1',
             'num_hints': 2,
             'status': 'active',
-            'config':[{
-                'name': "",
-                'type' : "",
-                `int 
-                text 
-                select 
-                float`
-            }
-
-            ]
+            'config':[
+                {
+                    'name': "speed",
+                    'type' : 'int'
+                },
+                {
+                    'name': "direction",
+                    'type' : 'select',
+                    'options': ["LEFT", "RIGHT"]
+                },
+                ]
             },
         '127.0.0.1:35054': {
             'device_name': 'Device2', 
             'num_hints': 2,
-            'status': 'active'
+            'status': 'active',
+            'config':[
+                {
+                    'name': "num_players",
+                    'type' : 'int'
+                },
+                {
+                    'name': "message",
+                    'type' : 'text',
+                },
+                ]
             }
         }
-    redis_client.set("connected_devices", )
-    previous_scenario = redis_client.lrange("scenarios_list", 0, -1)
-    if flow_name not in previous_scenario:
-        redis_client.lpush("scenarios_list", flow_name)
-
-    return jsonify({
-    'message': 'Flow data received successfully2',
-    'flow_id': flow_name 
-    }), 200
-
+    redis_client.set("connected_devices", json.dumps(devices_list))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True
+    app.run(host='0.0.0.0', port=port, debug=True)

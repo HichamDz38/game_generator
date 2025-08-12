@@ -51,6 +51,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const { setViewport } = useReactFlow();
   const [isEditable, setIsEditable] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [devices, setDevices] = useState({});
 
   const onNodeClick = (e, clickedNode) => {
     console.log('Node clicked:', clickedNode);
@@ -94,6 +95,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
     const type = event.dataTransfer.getData('application/reactflow');
     const label = event.dataTransfer.getData('application/label');
+    const config = JSON.parse(event.dataTransfer.getData('application/config'));
 
     if (typeof type === 'undefined' || !type) return;
 
@@ -108,12 +110,13 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       position,
       data: { 
         label: label || `${type} node`,
-        deviceType: type === 'device' ? 'device' : type
+        deviceType: type === 'device' ? 'device' : type,
+        config: config 
       },
     };
 
     setNodes((nds) => nds.concat(newNode));
-  }, [rfInstance, isEditable]);
+  }, [rfInstance, isEditable, devices]);
 
 
    const validateFlow = () => {

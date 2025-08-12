@@ -236,8 +236,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 15px;
-  border-bottom: 1px solid #eee;
+  padding: 1px 15px;
+  border-bottom: 3px solid #eee;
+}
+.nodeDetailsHeader2 {
+  padding: 1px 5px;
+  border-bottom: 3px solid #eee;
+  border-top: 3px solid #eee;
+  border-top-width: 100%;
 }
 
 .nodeDetailsContent {
@@ -261,3 +267,7 @@
 } 
 
 
+
+.configtit {
+  text-align: center;
+}
