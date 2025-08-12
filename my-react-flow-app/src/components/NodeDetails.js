@@ -26,14 +26,18 @@ function NodeDetails({ nodeData, onClose , OnDrop}) {
                     <p><strong>Options: </strong>{item.options.join(', ')}</p>
                     )} */}
                         <label>
-                            {item.name}:
+                            <strong style={{color:'black'}}>{item.name }</strong> : {""}
                                 {item.type === "select" ? (
                                 <select name={item.name}>
-                                    {item.option?.map((option, i) => (
+                                    {item.options?.length > 0 ? (
+                                      item.options.map((option, i) => (
                                         <option key={i} value={option}>
                                             {option}
                                         </option>
-                                    ))}
+                                    ))
+                                ) : (
+                                    <option disabled>(No options)</option>
+                                )}
                                 </select>
                             ) : (
                             <input name={item.name} type={item.type}/>
