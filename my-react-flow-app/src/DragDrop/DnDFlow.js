@@ -169,7 +169,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       const hasIncomingEdge = edges.some(edge => edge.target === NormalNodes.id);
       const hasOutgoingEdge = edges.some(edge => edge.source === NormalNodes.id);
       if (!hasIncomingEdge || !hasOutgoingEdge) {
-        errors.push(`each node must have two edges`);
+        errors.push(`each node must have at least one incoming edge and one outgoing edge`);
         return ;
       }
     });
