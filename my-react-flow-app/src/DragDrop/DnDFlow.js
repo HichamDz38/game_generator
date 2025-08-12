@@ -204,9 +204,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         const response = await axios.post('/save_flow', data);
         console.log('Flow updated:', response.data.flow_id);
         
-        if (onScenarioSaved) {
-          onScenarioSaved();
-        }
+        // if (onScenarioSaved) {
+        //   onScenarioSaved();
+        // }
       } catch (error) {
         console.error('Error saving flow:', error);
       }
