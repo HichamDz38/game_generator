@@ -2,6 +2,11 @@
   display: flex;  
   justify-content: flex-end; 
   background-color: #aa80ff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000; 
   }
 .links a {  
   color: white;  

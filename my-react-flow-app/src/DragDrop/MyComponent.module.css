@@ -11,6 +11,7 @@
   border: 2px solid red;
   font-size: 20px;
   width: 130px;
+  
 }
 
 .theme__button {
@@ -20,6 +21,7 @@
   text-transform: lowercase;
   border-color: #eee6ff;
   border-radius: 8px;
+  margin-top: 27%;
 }
 
 
