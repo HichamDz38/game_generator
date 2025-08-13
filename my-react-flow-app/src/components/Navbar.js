@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './MyComponent.module.css';
 
-function Navbarr({ onReturnScenarioSelect }) {
+function Navbar({ onReturnScenarioSelect }) {
   const handleReturnScenarioClick = () => {
     if (onReturnScenarioSelect) {
       onReturnScenarioSelect();
@@ -9,19 +9,32 @@ function Navbarr({ onReturnScenarioSelect }) {
   };
 
   return (
-    <>
-      <nav className={styles.navbar}>
-        <p className={styles.left}>ERPanel</p>
-        <ul className={styles.links}>
-          <a href="#" onClick={handleReturnScenarioClick}>SCENARIOS</a>
-          <a href="#">PROPS</a>
-          <a href="#">SOUND</a>
-          <a href="#">SETTINGS</a>
-          <a href="#">EXIT</a>
-        </ul>
-      </nav>
-    </>
+    <nav className={styles.navbar}>
+      <p className={styles.left}>ERPanel</p>
+      <ul className={styles.links}>
+        <li>
+          <button 
+            className={styles.navButton} 
+            onClick={handleReturnScenarioClick}
+          >
+            SCENARIOS
+          </button>
+        </li>
+        <li>
+          <button className={styles.navButton}>PROPS</button>
+        </li>
+        <li>
+          <button className={styles.navButton}>SOUND</button>
+        </li>
+        <li>
+          <button className={styles.navButton}>SETTINGS</button>
+        </li>
+        <li>
+          <button className={styles.navButton}>EXIT</button>
+        </li>
+      </ul>
+    </nav>
   );
 }
 
-export default Navbarr;
+export default Navbar;

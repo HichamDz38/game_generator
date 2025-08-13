@@ -9,7 +9,6 @@ import ReactFlow, {
   useEdgesState,
   Controls,
   Background,
-  useReactFlow,
   Panel,
   BackgroundVariant
 } from 'reactflow';
@@ -33,29 +32,23 @@ const initialNodes = [
   },
 ];
 
-const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
+//const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
-const flowKey = 'example-flow';
 
 const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState(null);
-  const [editValue, setEditValue] = useState('');
-  const [selectedNodeId, setSelectedNodeId] = useState('');
   const [currentScenarioName, setCurrentScenarioName] = useState('');
-  const { setViewport } = useReactFlow();
   const [isEditable, setIsEditable] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [devices, setDevices] = useState({});
-  const [draggedNodeId, setDraggedNodeId] = useState(null);
 
   const onNodeClick = (e, clickedNode) => {
-    if (!(clickedNode.type == 'input' || clickedNode.type == 'output')) {
+    if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
       setSelectedNode(clickedNode);
     }
   };
@@ -69,7 +62,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     if (isEditable) {
       setEdges((eds) => addEdge(params, eds));
     }
-  }, [isEditable]);
+  }, [isEditable, setEdges]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -81,7 +74,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     if (!isEditable) return;
     
     event.preventDefault();
-    const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
     const type = event.dataTransfer.getData('application/reactflow');
     const label = event.dataTransfer.getData('application/label');
     const config = JSON.parse(event.dataTransfer.getData('application/config'));
@@ -105,7 +97,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     };
 
     setNodes((nds) => nds.concat(newNode));
-  }, [rfInstance, isEditable, devices]);
+  }, [rfInstance, isEditable, setNodes]);
 
 
    const validateFlow = () => {
@@ -210,7 +202,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           "name": currentScenarioName
         };
         
-        const response = await axios.post('/save_flow', data);
+        await axios.post('/save_flow', data);
         
         // if (onScenarioSaved) {
         //   onScenarioSaved();
@@ -229,7 +221,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           "name": SC_Name
         };
         
-        const response = await axios.post('/save_flow', data);
+        await axios.post('/save_flow', data);
         setCurrentScenarioName(SC_Name);
         
         if (onScenarioSaved) {
@@ -241,7 +233,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const loadFlowFromBackend = async (flowId) => {
+  const loadFlowFromBackend = useCallback(async (flowId) => {
     try {
       const response = await axios.get(`/load-flow/${flowId}`);
       
@@ -259,10 +251,28 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         rfInstance.setViewport(response.data.viewport);
       }
       
-    } catch (error) {
-      console.error('Load error details:', error.response?.data);
-    }
-  };
+     } catch (error) {
+    console.error('Load error details:', error.response?.data);
+  }
+}, [rfInstance, setNodes, setEdges, setCurrentScenarioName, setIsEditable]);
+
+  useEffect(() => {
+    if (scenarioToLoad) {
+      loadFlowFromBackend(scenarioToLoad);
+      setIsEditable(false); 
+    } else {
+    setIsEditable(true);
+    setNodes(initialNodes);
+   // setEdges(initialEdges);
+    setCurrentScenarioName('');
+  }
+  }, [
+  scenarioToLoad, 
+  loadFlowFromBackend, 
+  setNodes, 
+  setIsEditable,
+  setCurrentScenarioName
+]);
 
   const handleSaveAs = async () => {
     const newScenarioName = prompt("Enter a new name for this scenario:");
@@ -319,30 +329,19 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     )
   }
 
-  const EditableNode = ({ id, data, isEditable, onChange }) => {
-    return (
-      <div>
-        {isEditable ? (
-          <input value={data.label} onChange={(e) => onChange(id, e.target.value)}
-            style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}/>
-        ) : (
-          <span>{data.label}</span>
-        )}
-      </div>
-    );
-  };
+  // const EditableNode = ({ id, data, isEditable, onChange }) => {
+  //   return (
+  //     <div>
+  //       {isEditable ? (
+  //         <input value={data.label} onChange={(e) => onChange(id, e.target.value)}
+  //           style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}/>
+  //       ) : (
+  //         <span>{data.label}</span>
+  //       )}
+  //     </div>
+  //   );
+  // };
 
-  useEffect(() => {
-    if (scenarioToLoad) {
-      loadFlowFromBackend(scenarioToLoad);
-      setIsEditable(false); 
-    } else {
-    setIsEditable(true);
-    setNodes(initialNodes);
-   // setEdges(initialEdges);
-    setCurrentScenarioName('');
-  }
-  }, [scenarioToLoad]);
 
   return (
     <div className="dndflow">
