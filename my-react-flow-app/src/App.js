@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import DnDFlow from './DragDrop/DnDFlow';
 import Navbar from './components/Navbar';
@@ -8,10 +8,8 @@ import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-do
 function FlowEditorWrapper() {
   const { scenarioName } = useParams();
   const navigate = useNavigate();
-  const [refreshScenarios, setRefreshScenarios] = useState(false);
 
   const handleScenarioSaved = () => {
-    setRefreshScenarios(prev => !prev);
     navigate('/scenarios');
   };
 
