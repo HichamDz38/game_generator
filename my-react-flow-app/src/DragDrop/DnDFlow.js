@@ -417,10 +417,13 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           </ReactFlow>
         </div>
         <Sidebar onLoadScenario={handleLoadScenario} />
-        <NodeDetails 
+        {isEditable && (
+          <NodeDetails 
           nodeData={selectedNode} 
           onClose={closeNodeDetails} 
         />
+        )}
+        
       </ReactFlowProvider>
     </div>
   );
