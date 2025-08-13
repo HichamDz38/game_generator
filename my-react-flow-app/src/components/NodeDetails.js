@@ -19,6 +19,8 @@ function NodeDetails({ nodeData, onClose }) {
       nodeData.data.config[element.name].value = element.value;
     });
 
+    onClose();
+
   };
 
   return (
@@ -36,14 +38,11 @@ function NodeDetails({ nodeData, onClose }) {
                         <label>
                             <strong style={{color:'black'}}>{item }</strong> : {""}
                                 {value.type === "select" ? (
-                                <select name={item}>
+                                <select name={item} defaultValue = {value.value}>
                                   <option ></option>
                                   
                                     {value.options.map((option, i) => (
-                                        (value.value === option)?
-                                        <option key={i} value={option} selected>
-                                            {option}
-                                        </option>:
+                                        
                                         <option key={i} value={option} >
                                             {option}
                                         </option>
@@ -51,7 +50,7 @@ function NodeDetails({ nodeData, onClose }) {
                                     ))}
                                 </select>
                             ) : (
-                            <input name={item} type={value.type} value={value.value}/>
+                            <input name={item} type={value.type} defaultValue={value.value}/>
                             )}
                         </label>
                     </div>
@@ -59,7 +58,7 @@ function NodeDetails({ nodeData, onClose }) {
                 })}
                 <div className={styles.configButtons}>
                   <button className={styles.theme__button} onClick={handleSave}>
-                      save
+                    save
                   </button>
                   <button onClick={onClose} className={styles.theme__button}>
                     close
