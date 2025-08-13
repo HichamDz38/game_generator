@@ -23,17 +23,10 @@ function NodeDetails({ nodeData, onClose }) {
 
   return (
     <div className={styles.nodeDetailsContainer} ref={containerRef}>
-        <div className={styles.nodeDetailsHeader}>
-            <h4>Node informations</h4>
-            <button onClick={onClose} className={styles.closeButton}>×</button>
-        </div>
         <div className={styles.nodeDetailsContent}>
             <p><strong>Name:</strong> {nodeData.data?.label}</p>
             <p><strong>Type:</strong> {nodeData.type}</p>
-            <div>
-                <div className={styles.nodeDetailsHeader2}>
-                    <h4>Node configiration</h4>
-                </div>
+            <div className={styles.nodeDetailsConfig}>
                 
                 {Object.keys(nodeData.data.config).map((item) => {
                   const value = nodeData.data.config[item];
@@ -45,10 +38,16 @@ function NodeDetails({ nodeData, onClose }) {
                                 {value.type === "select" ? (
                                 <select name={item}>
                                   <option ></option>
+                                  
                                     {value.options.map((option, i) => (
-                                        <option key={i} value={option}>
+                                        (value.value === option)?
+                                        <option key={i} value={option} selected>
+                                            {option}
+                                        </option>:
+                                        <option key={i} value={option} >
                                             {option}
                                         </option>
+                                        
                                     ))}
                                 </select>
                             ) : (
@@ -58,9 +57,14 @@ function NodeDetails({ nodeData, onClose }) {
                     </div>
                  );
                 })}
-                <button className={styles.theme__button} onClick={handleSave}>
-                    save
-                </button>
+                <div className={styles.configButtons}>
+                  <button className={styles.theme__button} onClick={handleSave}>
+                      save
+                  </button>
+                  <button onClick={onClose} className={styles.theme__button}>
+                    close
+                  </button>
+                </div>
             </div>
         </div>
     </div>

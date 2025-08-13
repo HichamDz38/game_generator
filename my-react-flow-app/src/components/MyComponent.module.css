@@ -237,13 +237,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 1px 15px;
-  border-bottom: 3px solid #eee;
 }
 .nodeDetailsHeader2 {
   padding: 1px 5px;
   border-bottom: 3px solid #eee;
   border-top: 3px solid #eee;
   border-top-width: 100%;
+}
+.nodeDetailsConfig {
+  border-top: 1px solid black;
+}
+
+.configButtons {
+  display: flex;
+  justify-content: center;
 }
 
 .nodeDetailsContent {
@@ -261,7 +268,6 @@
   text-transform: lowercase;
   border-color: #eee6ff;
   border-radius: 8px;
-  margin-left: 38%;
   margin-top: 10%;
 }
 

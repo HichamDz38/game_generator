@@ -54,21 +54,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [devices, setDevices] = useState({});
 
   const onNodeClick = (e, clickedNode) => {
-    console.log('Node clicked:', clickedNode);
-    setSelectedNode(clickedNode);
-
-    if (selectedNodeId === clickedNode.id) {
-      closeNodeDetails();
-      return;
-    }
-
-    if (isEditable) {
-      setEditValue(clickedNode.data.label);
-      setSelectedNodeId(clickedNode.id);
-      axios.post('/node-clicked', { 
-        nodeId: clickedNode.id,
-        nodeType: clickedNode.type 
-      }).catch(console.error);
+    if (!(clickedNode.type == 'input' || clickedNode.type == 'output')) {
+      setSelectedNode(clickedNode);
     }
   };
 
@@ -77,10 +64,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   }
 
   const onConnect = useCallback((params) => {
-    if (isEditable) {
-      setEdges((eds) => addEdge(params, eds));
-      axios.post('/connection-made', params).catch(console.error);
-    }
   }, [isEditable]);
 
   const onDragOver = useCallback((event) => {
@@ -222,7 +205,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         };
         
         const response = await axios.post('/save_flow', data);
-        console.log('Flow updated:', response.data.flow_id);
         
         // if (onScenarioSaved) {
         //   onScenarioSaved();
@@ -242,7 +224,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         };
         
         const response = await axios.post('/save_flow', data);
-        console.log('Flow saved with ID:', response.data.flow_id);
         setCurrentScenarioName(SC_Name);
         
         if (onScenarioSaved) {
