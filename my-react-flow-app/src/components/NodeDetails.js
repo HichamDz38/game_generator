@@ -35,9 +35,10 @@ function NodeDetails({ nodeData, onClose }) {
                  return (
                     <div key={item} >
                         <label>
-                            <strong style={{color:'black'}}>{item }</strong> : {""}
+                          <div className={styles.inputtitlecountainer}>
+                            <strong className={styles.titleinputNodeDetails}>{item }: </strong>  
                                 {value.type === "select" ? (
-                                <select name={item} defaultValue = {value.value}>
+                                <select name={item} defaultValue = {value.value} className={styles.optionNodeDetails}>
                                   <option ></option>
                                   
                                     {value.options.map((option, i) => (
@@ -49,9 +50,11 @@ function NodeDetails({ nodeData, onClose }) {
                                     ))}
                                 </select>
                             ) : (
-                            <input name={item} type={value.type} defaultValue={value.value}/>
+                            <input className={styles.inputNodeDetails} name={item} type={value.type} defaultValue={value.value}/>
                             )}
+                            </div>
                         </label>
+                        
                     </div>
                  );
                 })}

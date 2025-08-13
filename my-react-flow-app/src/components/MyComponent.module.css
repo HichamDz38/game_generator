@@ -253,6 +253,27 @@
   justify-content: center;
 }
 
+.titleinputNodeDetails {
+  color : black;
+  padding-top: 10%;
+}
+
+.inputtitlecountainer {
+  display: flex;
+}
+
+.optionNodeDetails {
+  color :black;
+  font-size: 15px;
+  margin-left: 8%;
+  appearance: base-select;
+}
+
+.inputNodeDetails {
+  height: 25px;
+  margin-left: 12%;
+}
+
 .nodeDetailsContent {
   padding: 15px;
 }
