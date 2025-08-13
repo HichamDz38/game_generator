@@ -88,9 +88,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 
     if (typeof type === 'undefined' || !type) return;
 
-    const position = rfInstance.project({
-      x: event.clientX - reactFlowBounds.left,
-      y: event.clientY - reactFlowBounds.top,
+    const position = rfInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
     });
     
     const newNode = {
