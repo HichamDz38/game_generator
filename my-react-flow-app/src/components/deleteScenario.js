@@ -23,7 +23,6 @@ export const deleteScenario = async (
         }
       } catch (error) {
         console.error('Error deleting :', error);
-        alert('Failed to delete ');
       }
     }
   };

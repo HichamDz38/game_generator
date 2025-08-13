@@ -31,7 +31,6 @@ function NodeDetails({ nodeData, onClose }) {
                 
                 {Object.keys(nodeData.data.config).map((item) => {
                   const value = nodeData.data.config[item];
-                 // console.log(item, value.type)
                  return (
                     <div key={item} >
                         <label>

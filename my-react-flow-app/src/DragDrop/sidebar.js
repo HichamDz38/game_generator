@@ -10,7 +10,6 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
     event.dataTransfer.setData('application/label', label);
     event.dataTransfer.setData('application/config', JSON.stringify(config));
     event.dataTransfer.effectAllowed = 'move';
-    console.log(config);
   };
 
   const fetchDevices = async () => {
