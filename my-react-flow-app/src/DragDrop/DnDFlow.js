@@ -332,7 +332,13 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   useEffect(() => {
     if (scenarioToLoad) {
       loadFlowFromBackend(scenarioToLoad);
-    }
+      setIsEditable(false); 
+    } else {
+    setIsEditable(true);
+    setNodes(initialNodes);
+   // setEdges(initialEdges);
+    setCurrentScenarioName('');
+  }
   }, [scenarioToLoad]);
 
   return (
