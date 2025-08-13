@@ -32,48 +32,11 @@ def index():
 @app.route('/get_devices', methods=['GET'])
 def get_devices():
     try:
-        connected_dev = redis_client.get("connected_devices")
-        if connected_dev:
-            return connected_dev
-        else:
-            return json.dumps({})
+        return json.loads(redis_client.get("connected_devices") or {})
     except Exception as e:
         print(f"Error getting devices: {e}")
         return json.dumps({})
     
-@app.route('/node_configiration', methods=['POST'])
-def node_configiration():
-    try:
-        data = request.get_json()
-        node_id = data['nodeId']
-        config = data['config']
-        scenarios = redis_client.lrange("scenarios_list", 0, -1)
-        
-        for scenario_name in scenarios:
-            flow_data = redis_client.get(f"scenario_{scenario_name}")
-            if flow_data:
-                flow = json.loads(flow_data)
-                for node in flow.get('nodes', []):
-                    if node['id'] == node_id:
-                        if 'data' not in node:
-                            node['data'] = {}
-                        node['data']['config_values'] = config
-                        redis_client.set(f"scenario_{scenario_name}", json.dumps(flow))
-                        return jsonify({
-                            "status": "success",
-                            "message": "Node configuration updated"
-                        })
-        
-        return jsonify({
-            "status": "error",
-            "message": "Node not found in any scenario"
-        }), 404
-        
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
     
 @app.route('/delete_scenario/<scenario_name>', methods=['DELETE'])
 def delete_scenario(scenario_name):
@@ -201,42 +164,39 @@ def reset_all():
 
 
 @app.route('/set_random_devices', methods=['GET'])
-def device_config():
+def save_random_device_config():
     
     devices_list = {
         '127.0.0.1:34914': {
             'device_name': 'Device1',
             'num_hints': 2,
             'status': 'active',
-            'config':[
-                {
-                    'name': "speed",
+            'config':{
+                "speed":{
                     'type' : 'number'
                 },
-                {
-                    'name': "direction",
+                "direction":{
                     'type' : 'select',
                     'options': ["LEFT", "RIGHT"]
-                },
-                ]
-            },
+                }
+            }
+        },
         '127.0.0.1:35054': {
             'device_name': 'Device2', 
             'num_hints': 2,
             'status': 'active',
-            'config':[
-                {
-                    'name': "num_players",
+            'config':{
+                "num_players":{
                     'type' : 'number'
                 },
-                {
-                    'name': "message",
+                "message":{
                     'type' : 'text',
-                },
-                ]
+                }
             }
         }
+        }
     redis_client.set("connected_devices", json.dumps(devices_list))
+    return json.loads(redis_client.get("connected_devices"))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
