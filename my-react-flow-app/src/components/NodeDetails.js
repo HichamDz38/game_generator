@@ -20,7 +20,6 @@ function NodeDetails({ nodeData, onClose }) {
     });
 
     onClose();
-
   };
 
   return (
