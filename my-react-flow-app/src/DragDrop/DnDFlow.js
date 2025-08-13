@@ -64,6 +64,9 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   }
 
   const onConnect = useCallback((params) => {
+    if (isEditable) {
+      setEdges((eds) => addEdge(params, eds));
+    }
   }, [isEditable]);
 
   const onDragOver = useCallback((event) => {
