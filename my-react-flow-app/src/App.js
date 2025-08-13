@@ -3,55 +3,61 @@ import { ReactFlowProvider } from 'reactflow';
 import DnDFlow from './DragDrop/DnDFlow';
 import Navbar from './components/Navbar';
 import Scenariopage from './components/Scenariopage';
-import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
-function FlowEditorWrapper() {
-  const { scenarioName } = useParams();
-  const navigate = useNavigate();
+export default function App() {
   const [refreshScenarios, setRefreshScenarios] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState(null);
+  const [showFlowEditor, setShowFlowEditor] = useState(false);
+
+  const handleScenarioSelect = (scenarioName) => {
+    setSelectedScenario(scenarioName);
+    setShowFlowEditor(true); 
+  };
+
+  const handleReturnScenarioSelect = () => {
+    setShowFlowEditor(false); 
+  };
+
+  const handleCreateNew = () => {
+    setSelectedScenario(null); 
+    setShowFlowEditor(true);
+  };
 
   const handleScenarioSaved = () => {
     setRefreshScenarios(prev => !prev);
-    navigate('/scenarios');
+    setSelectedScenario(null);
+    setShowFlowEditor(false); 
   };
 
   const handleBackToList = () => {
-    navigate('/scenarios');
+    setShowFlowEditor(false);
+    setSelectedScenario(null);
   };
 
   return (
-    <ReactFlowProvider>
-      <DnDFlow 
-        scenarioToLoad={scenarioName || null} 
-        onScenarioSaved={handleScenarioSaved}
-        onBackToList={handleBackToList}
-      />
-    </ReactFlowProvider>
-  );
-}
-
-export default function App() {
-  return (
     <div className="app">
-      <Navbar />
+      <Navbar onReturnScenarioSelect={handleReturnScenarioSelect}/>
       <div style={{ display: 'flex' }}>
-        <Routes>
-          <Route 
-            path="/scenarios" 
-            element={
-              <Scenariopage
-                onScenarioSelect={(scenarioName) => {
-                  window.location.href = `/flow/${scenarioName}`;
-                }}
-                onCreateNew={() => {
-                  window.location.href = '/flow';
-                }}
-              />
-            } 
+        {!showFlowEditor ? (
+          <Scenariopage
+            onScenarioSelect={handleScenarioSelect} 
+            onCreateNew={handleCreateNew}
+            key={refreshScenarios}
           />
-          <Route path="/flow/:scenarioName?" element={<FlowEditorWrapper />} />
-          <Route path="*" element={<Navigate to="/scenarios" replace />} />
-        </Routes>
+        ) : (
+          <div className="main-content">
+            <ReactFlowProvider>
+              <DnDFlow 
+                scenarioToLoad={selectedScenario} 
+                onScenarioSaved={handleScenarioSaved}
+                onBackToList={handleBackToList}
+              />
+            </ReactFlowProvider>
+          </div>
+          
+        )}
+        
       </div>
     </div>
   );
