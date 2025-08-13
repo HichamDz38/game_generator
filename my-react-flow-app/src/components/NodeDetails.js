@@ -39,7 +39,6 @@ function NodeDetails({ nodeData, onClose }) {
                   //{var value = nodeData.data.config[item]}
                  // console.log(item, value.type)
                     <div key={item} >
-                        <p>test hello world</p>
                         <label>
                             <strong style={{color:'black'}}>{item }</strong> : {""}
                                 {value.type === "select" ? (
