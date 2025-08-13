@@ -16,7 +16,7 @@ function NodeDetails({ nodeData, onClose }) {
     
     const formElements = containerRef.current.querySelectorAll('input, select');
     formElements.forEach(element => {
-      nodeData.data.config[element.name] = element.value;
+      nodeData.data.config[element.name].value = element.value;
     });
 
   };
@@ -35,9 +35,10 @@ function NodeDetails({ nodeData, onClose }) {
                     <h4>Node configiration</h4>
                 </div>
                 
-                {Object.entries(nodeData.data.config).map(([item, value]) => (  
-                  //{var value = nodeData.data.config[item]}
+                {Object.keys(nodeData.data.config).map((item) => {
+                  const value = nodeData.data.config[item];
                  // console.log(item, value.type)
+                 return (
                     <div key={item} >
                         <label>
                             <strong style={{color:'black'}}>{item }</strong> : {""}
@@ -55,7 +56,8 @@ function NodeDetails({ nodeData, onClose }) {
                             )}
                         </label>
                     </div>
-                ))}
+                 );
+                })}
                 <button className={styles.theme__button} onClick={handleSave}>
                     save
                 </button>
