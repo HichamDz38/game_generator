@@ -52,12 +52,14 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [isEditable, setIsEditable] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [devices, setDevices] = useState({});
+  const [draggedNodeId, setDraggedNodeId] = useState(null);
 
   const onNodeClick = (e, clickedNode) => {
     if (!(clickedNode.type == 'input' || clickedNode.type == 'output')) {
       setSelectedNode(clickedNode);
     }
   };
+
 
   const closeNodeDetails = () => {
     setSelectedNode(null);
@@ -73,6 +75,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
+
 
   const onDrop = useCallback((event) => {
     if (!isEditable) return;

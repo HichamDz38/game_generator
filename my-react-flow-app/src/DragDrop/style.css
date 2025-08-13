@@ -25,10 +25,12 @@
   
   .dndflow .dndnode {
     height: 35px;
+    width: 250px;
     padding: 4px;
     border: 1px solid #1a192b;
     border-radius: 4px;
     margin-bottom: 10px;
+    margin-left: 23%;
     display: flex;
     justify-content: center;
     align-items: center;
