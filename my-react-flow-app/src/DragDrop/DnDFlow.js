@@ -203,6 +203,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
         };
         
         await axios.post('/save_flow', data);
+        return true;
         
         // if (onScenarioSaved) {
         //   onScenarioSaved();
@@ -260,18 +261,27 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     if (scenarioToLoad) {
       loadFlowFromBackend(scenarioToLoad);
       setIsEditable(false); 
-    } else {
-    setIsEditable(true);
-    setNodes(initialNodes);
-   // setEdges(initialEdges);
-    setCurrentScenarioName('');
+    } else if (!scenarioToLoad && !currentScenarioName){
+        setIsEditable(true);
+        setNodes(initialNodes);
+      // setEdges(initialEdges);
+        setCurrentScenarioName('');
+        // {currentScenarioName && (
+        //     <div className={styles.scenarionnamebox}>
+        //       <div className={styles.scenarionname}>
+        //         scenario name: {currentScenarioName}
+        //       </div>
+        //     </div>
+        //   )}
+    
   }
   }, [
   scenarioToLoad, 
   loadFlowFromBackend, 
   setNodes, 
   setIsEditable,
-  setCurrentScenarioName
+  setCurrentScenarioName,
+  currentScenarioName
 ]);
 
   const handleSaveAs = async () => {
@@ -311,11 +321,21 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   };
 
   const handleSave = async () => {
-    await saveFlowToBackend();
-    setIsEditable(false);
+    const saveSuccess = await saveFlowToBackend();
+    if (saveSuccess) {
+      setIsEditable(false);
+    }
   };
 
   const handleSaveAsAndStayEditable = async () => {
+    const validation = validateFlow();
+    if (!validation.isValid) {
+      const errorMessage = "Cannot save flow due to the following issues:\n\n" + 
+      validation.errors.map((error, index) => `${index + 1}. ${error}`).join('\n') +
+      "\n\nPlease fix these issues before saving.";
+      alert(errorMessage);
+      return;
+    }
     await handleSaveAs();
   };
 
@@ -408,7 +428,10 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             <Controls />
           </ReactFlow>
         </div>
-        <Sidebar onLoadScenario={handleLoadScenario} />
+        {isEditable && (
+          <Sidebar onLoadScenario={handleLoadScenario} />
+        )}
+
         {isEditable && (
           <NodeDetails 
           nodeData={selectedNode} 

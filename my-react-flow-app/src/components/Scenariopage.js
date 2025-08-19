@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef  } from 'react';
 import styles from './MyComponent.module.css';
 import axios from 'axios';
 
@@ -10,6 +10,8 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
   const [newScenarioName, setNewScenarioName] = useState('');
   const [copyingScenario, setCopyingScenario] = useState(null);
   const [copyName, setCopyName] = useState('');
+
+  const myRef = useRef(null);
 
   const fetchScenarios = async () => {
     setLoading(true);
@@ -32,6 +34,12 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
   useEffect(() => {
     fetchScenarios();
   }, []); 
+
+  useEffect(() => {
+    if (myRef.current) {
+      myRef.current.scrollIntoView();
+    }
+  }, [scenarios]); 
 
   const handleScenarioClick = (scenarioName) => {
     if (onScenarioSelect) {
@@ -138,8 +146,10 @@ const startRenaming = (scenarioName, e) => {
     setCopyingScenario(null);
   };
 
+  
+
   return (
-    <div className={styles.Scenariopp}>
+    <div className={styles.Scenariopp} ref={myRef}>
       <h1 className={styles.title}>DASHBOARD SCENARIO</h1>
       <button className={styles.create_button} onClick={handleCreateNew}>
         CREATE NEW SCENARIO
@@ -150,7 +160,7 @@ const startRenaming = (scenarioName, e) => {
       ) : error ? (
         <p>Error loading scenarios: {error}</p>
       ) : scenarios.length > 0 ? (
-        <div className={styles.scenariosContainer}>
+        <div className={styles.scenariosContainer} style={{overflowY: 'scroll'}}>
           {scenarios.map((scenario, index) => (
             <div 
               key={index} 
@@ -184,6 +194,7 @@ const startRenaming = (scenarioName, e) => {
               )}
             </div>
           ))}
+          <div ref={myRef}></div>
         </div>
       ) : (
         <p>No scenarios available</p>
