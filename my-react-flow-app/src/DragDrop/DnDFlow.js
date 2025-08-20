@@ -21,13 +21,13 @@ const initialNodes = [
   {
     id: '1',
     type: 'input',
-    data: { label: 'input node' },
+    data: { label: 'start' },
     position: { x: 250, y: 5 },
   },
   {
     id: '2',
     type: 'output',
-    data: { label: 'output node' },
+    data: { label: 'end' },
     position: { x: 250, y: 200 },
   },
 ];
