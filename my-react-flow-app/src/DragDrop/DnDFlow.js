@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import { deleteScenario } from '../components/deleteScenario';
 import NodeDetails from '../components/NodeDetails';
+import DelayNode from '../components/DelayNode';
+//import DelayNodeConfig from '../components/DelayNodeConfig';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -16,6 +18,12 @@ import 'reactflow/dist/style.css';
 import axios from 'axios'; 
 import Sidebar from './sidebar';
 import './style.css';
+
+const nodeTypes = {
+  delay: DelayNode,
+};
+
+
 
 const initialNodes = [
   {
@@ -46,12 +54,33 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [currentScenarioName, setCurrentScenarioName] = useState('');
   const [isEditable, setIsEditable] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [showDelayConfig, setShowDelayConfig] = useState(false);
 
   const onNodeClick = (e, clickedNode) => {
-    if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
-      setSelectedNode(clickedNode);
-    }
-  };
+  if (clickedNode.data.deviceType === 'delay') {
+    setSelectedNode(clickedNode);
+    setShowDelayConfig(true);
+  } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
+    setSelectedNode(clickedNode);
+  }
+};
+
+    const closeDelayConfig = () => {
+      setShowDelayConfig(false);
+      setSelectedNode(null);
+    };
+
+    const updateNodeData = (nodeId, newData) => {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: newData }
+            : node
+        )
+      );
+      setShowDelayConfig(false);
+      setSelectedNode(null);
+    };
 
 
   const closeNodeDetails = () => {
@@ -401,6 +430,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            nodeTypes={nodeTypes}  
             onNodesChange={isEditable ? onNodesChange : undefined}
             onEdgesChange={isEditable ? onEdgesChange : undefined}
             onConnect={isEditable ? onConnect : undefined}
@@ -418,7 +448,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             zoomOnDoubleClick={true}
             selectNodesOnDrag={isEditable}
             fitView
-          >
+            >
             <Background 
               id="my-background" 
               gap={15} 
@@ -434,10 +464,19 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 
         {isEditable && (
           <NodeDetails 
-          nodeData={selectedNode} 
-          onClose={closeNodeDetails} 
-        />
+            nodeData={selectedNode} 
+            onClose={closeNodeDetails}
+            onUpdate={updateNodeData}  
+          />
         )}
+
+        {/* {showDelayConfig && (
+          <DelayNodeConfig
+            nodeData={selectedNode}
+            onUpdate={updateNodeData}
+            onClose={closeDelayConfig}
+          />
+        )} */}
         
       </ReactFlowProvider>
     </div>

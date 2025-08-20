@@ -193,6 +193,17 @@ def save_random_device_config():
                     'type' : 'text',
                 }
             }
+        },
+        'node': {
+            'device_name': 'Image',
+            'num_hints': 2,
+            'status': 'active',
+            'config':{
+                "image":{
+                    'type' : 'file',
+                    'accept' : 'image/*',
+                }
+            }
         }
         }
     redis_client.set("connected_devices", json.dumps(devices_list))

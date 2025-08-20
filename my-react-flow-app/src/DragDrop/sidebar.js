@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import './style.css'
+import DelayNode from '../components/DelayNode';
 
 function Sidebar({ onLoadScenario , onNodeClick}) {
   const [devices, setDevices] = useState({});
@@ -55,6 +56,19 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
           <div className="no-devices">No devices connected</div>
           
         )}
+        <br></br><br></br>
+        <p className={styles.titledev2}>virtual nodes</p>
+          <div
+              className="dndnode device"
+              onDragStart={(event) => onDragStart(event, 'default', 'Delay Node', deviceData.config)} 
+              draggable
+            >
+              Delay node
+            </div>
+        <div>
+        
+      </div>
+
       </div>
 
       
