@@ -116,7 +116,7 @@ const NodeDetails = ({ nodeData, onClose, onUpdate }) => {
         </div>
       )}
       
-      <div style={{ marginTop: '20px' }}>
+      <div style={{ marginTop: '40px' }}>
         <button onClick={handleSave}>Save</button>
         <button onClick={onClose} style={{ marginLeft: '10px' }}>Close</button>
       </div>
