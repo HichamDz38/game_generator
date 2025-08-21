@@ -40,7 +40,6 @@ const initialNodes = [
   },
 ];
 
-//const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
 
 const getId = () => `dndnode_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -475,7 +474,3 @@ export default DnDFlow;
 
 
 
-
-
-// Usage example :
-// loadFlow('668a2e9d-2292-45e6-b0db-165ebe69213c')
