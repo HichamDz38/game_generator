@@ -318,3 +318,150 @@ select {
 .configtit {
   text-align: center;
 }
+
+
+.inputNodeDetails[type="file"] {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  margin-left: 12%;
+  height: auto;
+  font-size: 14px;
+  color: #333;
+}
+
+.inputNodeDetails[type="file"]:focus {
+  outline: none;
+  border-color: #aa80ff;
+  box-shadow: 0 0 0 2px rgba(170, 128, 255, 0.2);
+}
+
+/* File input container */
+.fileInputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Upload status messages */
+.uploadStatus {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  margin-left: 12%;
+}
+
+.uploading {
+  color: #007bff;
+}
+
+.uploadSuccess {
+  color: #28a745;
+}
+
+.uploadError {
+  color: #dc3545;
+}
+
+/* Image preview styling */
+.imagePreviewContainer {
+  margin-top: 10px;
+  margin-left: 12%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.imagePreview {
+  max-width: 150px;
+  max-height: 150px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  padding: 4px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.imagePreview:hover {
+  border-color: #aa80ff;
+}
+
+.currentImageText {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.currentImageLink {
+  color: #007bff;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.currentImageLink:hover {
+  text-decoration: underline;
+}
+
+/* Button disabled state */
+.theme__button:disabled {
+  background-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+  border-color: #ccc;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .inputNodeDetails[type="file"] {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .imagePreviewContainer {
+    margin-left: 0;
+  }
+  
+  .uploadStatus {
+    margin-left: 0;
+  }
+}
+
+/* Loading animation for upload */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.uploadingAnimation {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* File input label styling */
+.fileInputLabel {
+  display: inline-block;
+  padding: 8px 12px;
+  background-color: #aa80ff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 12%;
+  transition: background-color 0.2s ease;
+}
+
+.fileInputLabel:hover {
+  background-color: #9955ff;
+}
+
+.fileInputLabel:active {
+  background-color: #8844ff;
+}
+
+/* Hide the default file input */
+.hiddenFileInput {
+  display: none;
+}

@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import redis
 import json
+from werkzeug.utils import secure_filename
 import datetime
 import uuid
 
@@ -13,6 +14,16 @@ redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_respon
 
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
 CORS(app)
 
 CORS(app, resources={
@@ -208,6 +219,55 @@ def save_random_device_config():
         }
     redis_client.set("connected_devices", json.dumps(devices_list))
     return json.loads(redis_client.get("connected_devices"))
+
+
+@app.route('/upload-image', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        unique_filename = f"image_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        file.save(filepath)
+        image_url = f"/static/uploads/{unique_filename}"
+        
+        node_id = request.form.get('nodeId')
+        scenario_name = request.form.get('scenarioName')
+        
+        if node_id and scenario_name:
+            scenario_key = f"scenario_{scenario_name}"
+            scenario_data = redis_client.get(scenario_key)
+            
+            if scenario_data:
+                scenario_data = json.loads(scenario_data)
+                for node in scenario_data.get('nodes', []):
+                    if node['id'] == node_id and 'config' in node.get('data', {}):
+                        if 'image' in node['data']['config']:
+                            node['data']['config']['image']['value'] = image_url
+                
+                redis_client.set(scenario_key, json.dumps(scenario_data))
+        
+        return jsonify({
+            'message': 'File uploaded successfully',
+            'imageUrl': image_url
+        }), 200
+    
+    return jsonify({'error': 'Invalid file type'}), 400
+
+
+@app.route('/static/uploads/<path:filename>')
+def serve_uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+os.makedirs('static/uploads', exist_ok=True)
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

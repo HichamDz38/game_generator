@@ -466,7 +466,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
           <NodeDetails 
             nodeData={selectedNode} 
             onClose={closeNodeDetails}
-            onUpdate={updateNodeData}  
+            onUpdate={updateNodeData}
+            scenarioName={currentScenarioName}
           />
         )}
 
