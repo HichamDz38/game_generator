@@ -1,3 +1,6 @@
 test.js
 node_modules/
+.vite/
 build/
+public/
+__pycache__/
