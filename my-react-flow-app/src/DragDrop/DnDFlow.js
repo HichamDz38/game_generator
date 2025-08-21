@@ -42,8 +42,7 @@ const initialNodes = [
 
 //const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
 
-let id = 0;
-const getId = () => `dndnode_${id++}`;
+const getId = () => `dndnode_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 
 const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
@@ -55,6 +54,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [isEditable, setIsEditable] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [showDelayConfig, setShowDelayConfig] = useState(false);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   const onNodeClick = (e, clickedNode) => {
   if (clickedNode.data.deviceType === 'delay') {
@@ -100,33 +100,33 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 
 
   const onDrop = useCallback((event) => {
-    if (!isEditable) return;
-    
-    event.preventDefault();
-    const type = event.dataTransfer.getData('application/reactflow');
-    const label = event.dataTransfer.getData('application/label');
-    const config = JSON.parse(event.dataTransfer.getData('application/config'));
+  if (!isEditable) return;
+  
+  event.preventDefault();
+  const type = event.dataTransfer.getData('application/reactflow');
+  const label = event.dataTransfer.getData('application/label');
+  const config = JSON.parse(event.dataTransfer.getData('application/config'));
 
-    if (typeof type === 'undefined' || !type) return;
+  if (typeof type === 'undefined' || !type) return;
 
-    const position = rfInstance.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-    
-    const newNode = {
-      id: getId(),
-      type: type === 'device' ? 'default' : type, 
-      position,
-      data: { 
-        label: label || `${type} node`,
-        deviceType: type === 'device' ? 'device' : type,
-        config: config 
-      },
-    };
+  const position = rfInstance.screenToFlowPosition({
+    x: event.clientX,
+    y: event.clientY,
+  });
+  
+  const newNode = {
+    id: getId(),
+    type: type === 'device' ? 'default' : type, 
+    position,
+    data: { 
+      label: label || `${type} node`,
+      deviceType: type === 'device' ? 'device' : type,
+      config: config 
+    },
+  };
 
-    setNodes((nds) => nds.concat(newNode));
-  }, [rfInstance, isEditable, setNodes]);
+  setNodes((nds) => nds.concat(newNode));
+}, [rfInstance, isEditable, setNodes]);
 
 
    const validateFlow = () => {
@@ -287,31 +287,18 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 }, [rfInstance, setNodes, setEdges, setCurrentScenarioName, setIsEditable]);
 
   useEffect(() => {
-    if (scenarioToLoad) {
-      loadFlowFromBackend(scenarioToLoad);
-      setIsEditable(false); 
-    } else if (!scenarioToLoad && !currentScenarioName){
-        setIsEditable(true);
-        setNodes(initialNodes);
-      // setEdges(initialEdges);
-        setCurrentScenarioName('');
-        // {currentScenarioName && (
-        //     <div className={styles.scenarionnamebox}>
-        //       <div className={styles.scenarionname}>
-        //         scenario name: {currentScenarioName}
-        //       </div>
-        //     </div>
-        //   )}
-    
+  if (scenarioToLoad) {
+    loadFlowFromBackend(scenarioToLoad);
+    setIsEditable(false);
+    setIsCreatingNew(false);
+  } else if (!scenarioToLoad && !currentScenarioName && isCreatingNew){
+      setIsEditable(true);
+      setNodes(initialNodes);
+      setCurrentScenarioName('');
   }
-  }, [
-  scenarioToLoad, 
-  loadFlowFromBackend, 
-  setNodes, 
-  setIsEditable,
-  setCurrentScenarioName,
-  currentScenarioName
-]);
+}, [scenarioToLoad, currentScenarioName, isCreatingNew, loadFlowFromBackend, setNodes, setIsEditable, setCurrentScenarioName]);
+
+
 
   const handleSaveAs = async () => {
     const newScenarioName = prompt("Enter a new name for this scenario:");
