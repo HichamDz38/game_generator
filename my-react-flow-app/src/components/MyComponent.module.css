@@ -18,14 +18,12 @@
 .navbar .left {
   margin-right: 57%;
 }
-.Scenariopp {
-  height: 100%; 
+.Scenariopp { 
   width: 100%; 
-  position: fixed; 
+  position: absolute; 
   z-index: 1; 
   left: 0;
   background-color: #eee6ff; 
-  overflow-x: hidden;
   top: 6%;
 }
 
@@ -461,7 +459,6 @@ select {
   background-color: #8844ff;
 }
 
-/* Hide the default file input */
 .hiddenFileInput {
   display: none;
 }

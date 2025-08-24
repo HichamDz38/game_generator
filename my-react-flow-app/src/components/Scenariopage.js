@@ -37,7 +37,7 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
 
   useEffect(() => {
     if (myRef.current) {
-      myRef.current.scrollIntoView();
+      myRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [scenarios]); 
 
@@ -160,7 +160,7 @@ const startRenaming = (scenarioName, e) => {
       ) : error ? (
         <p>Error loading scenarios: {error}</p>
       ) : scenarios.length > 0 ? (
-        <div className={styles.scenariosContainer} style={{overflowY: 'scroll'}}>
+        <div className={styles.scenariosContainer} >
           {scenarios.map((scenario, index) => (
             <div 
               key={index} 
