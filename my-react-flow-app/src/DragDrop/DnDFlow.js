@@ -50,10 +50,10 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState(null);
   const [currentScenarioName, setCurrentScenarioName] = useState('');
-  const [isEditable, setIsEditable] = useState(false);
+  const [isEditable, setIsEditable] = useState(!scenarioToLoad);
   const [selectedNode, setSelectedNode] = useState(null);
   const [showDelayConfig, setShowDelayConfig] = useState(false);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [isCreatingNew, setIsCreatingNew] = useState(!scenarioToLoad);
 
   const onNodeClick = (e, clickedNode) => {
   if (clickedNode.data.deviceType === 'delay') {
@@ -275,6 +275,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       setCurrentScenarioName(flowId);
       
       setIsEditable(false);
+      setIsCreatingNew(false);
       
       if (response.data.viewport && rfInstance) {
         rfInstance.setViewport(response.data.viewport);
@@ -288,16 +289,23 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   useEffect(() => {
   if (scenarioToLoad) {
     loadFlowFromBackend(scenarioToLoad);
-    setIsEditable(false);
-    setIsCreatingNew(false);
-  } else if (!scenarioToLoad && !currentScenarioName && isCreatingNew){
+    // setIsEditable(false);
+    // setIsCreatingNew(false);
+  // } else if (!scenarioToLoad && !currentScenarioName) {
+  //     setIsEditable(true);
+  //     setIsCreatingNew(true);
+  //     setNodes(initialNodes);
+  //     setCurrentScenarioName('');
+  // }
+  }else {
       setIsEditable(true);
+      setIsCreatingNew(true);
       setNodes(initialNodes);
+      setEdges([]);
       setCurrentScenarioName('');
-  }
+    }
 }, [scenarioToLoad, currentScenarioName, isCreatingNew, loadFlowFromBackend, setNodes, setIsEditable, setCurrentScenarioName]);
-
-
+ 
 
   const handleSaveAs = async () => {
     const newScenarioName = prompt("Enter a new name for this scenario:");
@@ -444,7 +452,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             <Controls />
           </ReactFlow>
         </div>
-        {!scenarioToLoad && isEditable && ( 
+        {isEditable && ( 
           <Sidebar onLoadScenario={handleLoadScenario} />
         )}
 
