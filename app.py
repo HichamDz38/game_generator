@@ -204,6 +204,16 @@ def save_random_device_config():
                 }
             }
         },
+        '127.0.0.1:350004': {
+            'device_name': 'Device3', 
+            'num_hints': 2,
+            'status': 'active',
+            'config':{
+                "Agree!":{
+                    'type' : 'checkbox'
+                }
+            }
+        },
         'node': {
             'device_name': 'Image',
             'num_hints': 2,
@@ -220,6 +230,9 @@ def save_random_device_config():
                 "image3":{
                     'type' : 'file',
                     'accept' : 'image/*',
+                },
+                "Do you agree !":{
+                    'type' : 'checkbox'
                 }
             }
         }

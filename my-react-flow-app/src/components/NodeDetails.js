@@ -168,6 +168,15 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
                           </div>
                         )}
                       </div>
+                      ) : value.type === "checkbox" ? (
+                      <div>
+                        <label >
+                          <input 
+                            type={value.type}
+                            name={item} 
+                          />
+                        </label>
+                      </div>
                     ) : (
                       <input 
                         className={styles.inputNodeDetails} 

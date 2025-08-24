@@ -154,7 +154,7 @@ const startRenaming = (scenarioName, e) => {
       <button className={styles.create_button} onClick={handleCreateNew}>
         CREATE NEW SCENARIO
       </button>
-      <h2 className={styles.secondtitle}>LIST OF SCENARIOS:</h2>
+      <h2 className={styles.secondtitle}></h2>
       {loading ? (
         <p>Loading scenarios...</p>
       ) : error ? (
