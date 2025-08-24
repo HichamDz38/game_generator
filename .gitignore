@@ -4,3 +4,4 @@ node_modules/
 build/
 public/
 __pycache__/
+/src/README.md

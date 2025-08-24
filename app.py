@@ -18,7 +18,6 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
 
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -210,7 +209,15 @@ def save_random_device_config():
             'num_hints': 2,
             'status': 'active',
             'config':{
-                "image":{
+                "image1":{
+                    'type' : 'file',
+                    'accept' : 'image/*',
+                },
+                "image2":{
+                    'type' : 'file',
+                    'accept' : 'image/*',
+                },
+                "image3":{
                     'type' : 'file',
                     'accept' : 'image/*',
                 }
@@ -232,7 +239,10 @@ def upload_image():
     
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        unique_filename = f"image_{filename}"
+        # Add timestamp and field name to make filename unique
+        field_name = request.form.get('fieldName', '')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{field_name}_{timestamp}_{filename}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         
         file.save(filepath)
@@ -240,23 +250,26 @@ def upload_image():
         
         node_id = request.form.get('nodeId')
         scenario_name = request.form.get('scenarioName')
+        field_name = request.form.get('fieldName')
         
-        if node_id and scenario_name:
+        if node_id and scenario_name and field_name:
             scenario_key = f"scenario_{scenario_name}"
             scenario_data = redis_client.get(scenario_key)
             
             if scenario_data:
                 scenario_data = json.loads(scenario_data)
                 for node in scenario_data.get('nodes', []):
-                    if node['id'] == node_id and 'config' in node.get('data', {}):
-                        if 'image' in node['data']['config']:
-                            node['data']['config']['image']['value'] = image_url
+                    if (node['id'] == node_id and 
+                        'config' in node.get('data', {}) and 
+                        field_name in node['data']['config']):
+                        node['data']['config'][field_name]['value'] = image_url
                 
                 redis_client.set(scenario_key, json.dumps(scenario_data))
         
         return jsonify({
             'message': 'File uploaded successfully',
-            'imageUrl': image_url
+            'imageUrl': image_url,
+            'fieldName': field_name
         }), 200
     
     return jsonify({'error': 'Invalid file type'}), 400
@@ -265,9 +278,6 @@ def upload_image():
 @app.route('/static/uploads/<path:filename>')
 def serve_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-os.makedirs('static/uploads', exist_ok=True)
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

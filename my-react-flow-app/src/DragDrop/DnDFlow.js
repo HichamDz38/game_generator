@@ -444,7 +444,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             <Controls />
           </ReactFlow>
         </div>
-        {isEditable && (
+        {!scenarioToLoad && isEditable && ( 
           <Sidebar onLoadScenario={handleLoadScenario} />
         )}
 

@@ -3,46 +3,52 @@ import styles from './MyComponent.module.css';
 
 function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
   const containerRef = useRef(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('');
+  const [imagePreviews, setImagePreviews] = useState({});
+  const [uploading, setUploading] = useState({});
+  const [uploadStatus, setUploadStatus] = useState({});
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {
-      const imageConfig = nodeData.data.config.image;
-      if (imageConfig && imageConfig.value) {
-        if (imageConfig.value.startsWith('data:image/')) {
-          setImagePreview(imageConfig.value);
-        } else {
-          setImagePreview(imageConfig.value);
+      const previews = {};
+      Object.keys(nodeData.data.config).forEach(key => {
+        const config = nodeData.data.config[key];
+        if (config.type === 'file' && config.value) {
+          if (config.value.startsWith('data:image/')) {
+            previews[key] = config.value;
+          } else {
+            previews[key] = config.value;
+          }
         }
-      }
+      });
+      setImagePreviews(previews);
     }
   }, [nodeData]);
 
   if (!nodeData) return null;
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = async (e, fieldName) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target.result;
-      setImagePreview(dataUrl);
-      if (nodeData.data.config.image) {
-        nodeData.data.config.image.tempDataUrl = dataUrl;
+      setImagePreviews(prev => ({ ...prev, [fieldName]: dataUrl }));
+      if (nodeData.data.config[fieldName]) {
+        nodeData.data.config[fieldName].tempDataUrl = dataUrl;
       }
     };
     reader.readAsDataURL(file);
-    setUploading(true);
-    setUploadStatus('uploading');
+    
+    setUploading(prev => ({ ...prev, [fieldName]: true }));
+    setUploadStatus(prev => ({ ...prev, [fieldName]: 'uploading' }));
     
     try {
       const formData = new FormData();
       formData.append('image', file);
       formData.append('nodeId', nodeData.id);
       formData.append('scenarioName', scenarioName);
+      formData.append('fieldName', fieldName);
 
       const response = await fetch('/upload-image', {
         method: 'POST',
@@ -51,19 +57,25 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
 
       if (response.ok) {
         const data = await response.json();
-        nodeData.data.config.image.value = data.imageUrl;
-        delete nodeData.data.config.image.tempDataUrl;
-        setUploadStatus('success');
-        setTimeout(() => setUploadStatus(''), 2000);
-      } else {
+        nodeData.data.config[fieldName].value = data.imageUrl;
+        delete nodeData.data.config[fieldName].tempDataUrl;
+        setUploadStatus(prev => ({ ...prev, [fieldName]: 'success' }));
+        setTimeout(() => {
+          setUploadStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[fieldName];
+            return newStatus;
+          });
+        }, 2000);
+      } else { 
         console.error('Upload failed');
-        setUploadStatus('error');
+        setUploadStatus(prev => ({ ...prev, [fieldName]: 'error' }));
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadStatus('error');
+      setUploadStatus(prev => ({ ...prev, [fieldName]: 'error' }));
     }
-    setUploading(false);
+    setUploading(prev => ({ ...prev, [fieldName]: false }));
   };
 
   const handleSave = async (e) => {
@@ -77,9 +89,15 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
       }
     });
 
-    if (nodeData.data.config.image && 
-        nodeData.data.config.image.tempDataUrl && 
-        !nodeData.data.config.image.value.startsWith('/static/uploads/')) {
+    const hasUnuploadedImages = Object.keys(nodeData.data.config).some(key => {
+      const config = nodeData.data.config[key];
+      return config.type === 'file' && 
+             config.tempDataUrl && 
+             !config.value.startsWith('/static/uploads');
+    });
+
+    if (hasUnuploadedImages) {
+      alert('Please complete all image uploads before saving');
       return;
     }
 
@@ -89,8 +107,9 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
     onClose();
   };
 
-  const getUploadStatusMessage = () => {
-    switch (uploadStatus) {
+  const getUploadStatusMessage = (fieldName) => {
+    const status = uploadStatus[fieldName];
+    switch (status) {
       case 'uploading':
         return <span className={`${styles.uploadStatus} ${styles.uploading}`}>Uploading...</span>;
       case 'success':
@@ -101,6 +120,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
         return null;
     }
   };
+
+  const isAnyUploading = Object.values(uploading).some(status => status);
 
   return (
     <div className={styles.nodeDetailsContainer} ref={containerRef}>
@@ -125,23 +146,23 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
                     ) : value.type === "file" ? (
                       <div className={styles.fileInputContainer}>
                         <label className={styles.fileInputLabel}>
-                          Choose Image
+                          Choose {item}
                           <input 
                             type="file" 
                             name={item} 
                             accept={value.accept || 'image/*'}
-                            onChange={handleFileChange}
+                            onChange={(e) => handleFileChange(e, item)}
                             className={styles.hiddenFileInput}
-                            disabled={uploading}
+                            disabled={uploading[item]}
                           />
                         </label>
-                        {getUploadStatusMessage()}
+                        {getUploadStatusMessage(item)}
                         
-                        {imagePreview && (
+                        {imagePreviews[item] && (
                           <div className={styles.imagePreviewContainer}>
                             <img 
-                              src={imagePreview} 
-                              alt="Preview" 
+                              src={imagePreviews[item]} 
+                              alt={`${item} preview`} 
                               className={styles.imagePreview}
                             />
                           </div>
@@ -164,14 +185,14 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
             <button 
               className={styles.theme__button} 
               onClick={handleSave} 
-              disabled={uploading}
+              disabled={isAnyUploading}
             >
-              {uploading ? 'Uploading...' : 'Save'}
+              {isAnyUploading ? 'Uploading...' : 'Save'}
             </button>
             <button 
               onClick={onClose} 
               className={styles.theme__button} 
-              disabled={uploading}
+              disabled={isAnyUploading}
             >
               Close
             </button>
