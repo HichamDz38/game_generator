@@ -3,7 +3,6 @@ import styles from './MyComponent.module.css';
 import { deleteScenario } from '../components/deleteScenario';
 import NodeDetails from '../components/NodeDetails';
 import DelayNode from '../components/DelayNode';
-//import DelayNodeConfig from '../components/DelayNodeConfig';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -289,15 +288,7 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   useEffect(() => {
   if (scenarioToLoad) {
     loadFlowFromBackend(scenarioToLoad);
-    // setIsEditable(false);
-    // setIsCreatingNew(false);
-  // } else if (!scenarioToLoad && !currentScenarioName) {
-  //     setIsEditable(true);
-  //     setIsCreatingNew(true);
-  //     setNodes(initialNodes);
-  //     setCurrentScenarioName('');
-  // }
-  }else {
+  } else {
       setIsEditable(true);
       setIsCreatingNew(true);
       setNodes(initialNodes);
@@ -371,20 +362,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
       onScenarioSaved
     )
   }
-
-  // const EditableNode = ({ id, data, isEditable, onChange }) => {
-  //   return (
-  //     <div>
-  //       {isEditable ? (
-  //         <input value={data.label} onChange={(e) => onChange(id, e.target.value)}
-  //           style={{ border: '1px solid #ccc', padding: '2px', width: '100%' }}/>
-  //       ) : (
-  //         <span>{data.label}</span>
-  //       )}
-  //     </div>
-  //   );
-  // };
-
 
   return (
     <div className="dndflow">
@@ -464,14 +441,6 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             scenarioName={currentScenarioName}
           />
         )}
-
-        {/* {showDelayConfig && (
-          <DelayNodeConfig
-            nodeData={selectedNode}
-            onUpdate={updateNodeData}
-            onClose={closeDelayConfig}
-          />
-        )} */}
         
       </ReactFlowProvider>
     </div>
