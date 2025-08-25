@@ -9,7 +9,6 @@ import uuid
 
 redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
 
-redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
 
 
 
@@ -27,7 +26,11 @@ CORS(app)
 
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://10.48.12.4:3000"],
+        "origins": [
+            "http://localhost:3000",      # For local development
+            "http://frontend:3000",       # For Docker container communication
+            "http://10.48.12.4:3000"     # Your existing origin
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE"],
         "allow_headers": ["Content-Type"]
     }
@@ -211,6 +214,10 @@ def save_random_device_config():
             'config':{
                 "Agree!":{
                     'type' : 'checkbox'
+                },
+                "image1":{
+                    'type' : 'file',
+                    'accept' : 'image/*',
                 }
             }
         },

@@ -18,6 +18,8 @@ import axios from 'axios';
 import Sidebar from './sidebar';
 import './style.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const nodeTypes = {
   delay: DelayNode,
 };

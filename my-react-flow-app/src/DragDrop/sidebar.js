@@ -60,7 +60,7 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
         <p className={styles.titledev2}>virtual nodes</p>
           <div
               className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'default', 'Delay Node', deviceData.config)} 
+              onDragStart={(event) => onDragStart(event, 'default', 'Delay Node')} 
               draggable
             >
               Delay node

@@ -201,6 +201,6 @@ const startRenaming = (scenarioName, e) => {
       )}
     </div>
   );
-}
+} 
 
 export default Scenariopage;

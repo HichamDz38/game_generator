@@ -18,7 +18,23 @@ services:
       - .:/capp
     depends_on:
       - redis
+    environment:
+      - FLASK_ENV=production
    
+  frontend:
+    build:
+      context: ./my-react-flow-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./my-react-flow-app:/app
+      - /app/node_modules
+    depends_on:
+      - gamepanel
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
 
   # game:
   #   build:
