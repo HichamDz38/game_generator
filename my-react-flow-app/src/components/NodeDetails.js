@@ -82,10 +82,14 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
     e.preventDefault();
     if (!containerRef.current) return;
     
-    const formElements = containerRef.current.querySelectorAll('input, select');
+    const formElements = containerRef.current.querySelectorAll('input, select, textarea');
     formElements.forEach(element => {
       if (element.type !== 'file') {
-        nodeData.data.config[element.name].value = element.value;
+        if (element.type === 'checkbox') {
+          nodeData.data.config[element.name].value = element.checked ? 'yes' : 'no';
+        } else {
+          nodeData.data.config[element.name].value = element.value;
+        }
       }
     });
 
@@ -174,6 +178,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
                           <input 
                             type={value.type}
                             name={item} 
+                            defaultChecked={value.value === 'yes' || value.value === true}
+                            value={value.value || 'yes'}
                           />
                         </label>
                       </div>

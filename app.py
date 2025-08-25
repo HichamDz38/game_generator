@@ -232,7 +232,8 @@ def save_random_device_config():
                     'accept' : 'image/*',
                 },
                 "Do you agree !":{
-                    'type' : 'checkbox'
+                    'type' : 'checkbox',
+                    'value' : 'yes'
                 }
             }
         }
