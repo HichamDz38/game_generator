@@ -14,6 +14,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+RUN mkdir -p /app/static/uploads
+
 # Expose port
 EXPOSE 3000
 
