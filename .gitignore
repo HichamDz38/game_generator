@@ -2,6 +2,5 @@ test.js
 node_modules/
 .vite/
 build/
-public/
 __pycache__/
 /src/README.md
