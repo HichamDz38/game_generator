@@ -29,9 +29,9 @@ CORS(app)
 CORS(app, resources={
     r"/*": {
         "origins": [
-            "http://localhost:3000",      # For local development
-            "http://frontend:3000",       # For Docker container communication
-            "http://10.48.12.4:3000"     # Your existing origin
+            "http://localhost:3000",      
+            "http://frontend:3000",      
+            "http://10.48.12.4:3000"     
         ],
         "methods": ["GET", "POST", "PUT", "DELETE"],
         "allow_headers": ["Content-Type"]

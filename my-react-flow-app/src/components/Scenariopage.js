@@ -197,7 +197,7 @@ const startRenaming = (scenarioName, e) => {
           <div ref={myRef}></div>
         </div>
       ) : (
-        <p>No scenarios available</p>
+        <p></p>
       )}
     </div>
   );
