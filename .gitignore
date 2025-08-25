@@ -1,6 +1,6 @@
 test.js
-node_modules/
-.vite/
-build/
-__pycache__/
-/src/README.md
+# node_modules/
+# .vite/
+# build/
+# __pycache__/
+# /src/README.md
