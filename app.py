@@ -7,7 +7,13 @@ from werkzeug.utils import secure_filename
 import datetime
 import uuid
 
-redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
+redis_host = os.environ.get('REDIS_HOST', 'redis')
+redis_port = os.environ.get('REDIS_PORT', 6379)
+redis_db = os.environ.get('REDIS_DB', 0)
+
+redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
+
+# redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
 
 
 
