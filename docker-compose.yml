@@ -8,21 +8,18 @@ services:
     restart: unless-stopped
 
   gamepanel:
-  build:
-    context: .
-    dockerfile: Dockerfile
-  ports:
-    - "5000:5000"
-  restart: unless-stopped
-  volumes:
-    - .:/capp
-  depends_on:
-    - redis
-  environment:
-    - FLASK_ENV=production
-    - REDIS_HOST=redis
-    - REDIS_PORT=6379
-    - REDIS_DB=0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    volumes:
+      - .:/capp
+    depends_on:
+      - redis
+    environment:
+      - FLASK_ENV=production
    
   frontend:
     build:
