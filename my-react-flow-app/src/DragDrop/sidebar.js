@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styles from './MyComponent.module.css';
 import './style.css'
 
-function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
+function Sidebar({nodeData, onLoadScenario  , onNodeClick}) {
   const [devices, setDevices] = useState({});
   const idCounter = useRef(0);
 
@@ -47,7 +47,7 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
         <br></br><br></br>
         {Object.keys(devices).length > 0 ? (
           Object.entries(devices).map(([deviceId, deviceData]) => {
-            const uniqueId = `N${idCounter.current}`;
+            const uniqueId = idCounter.current;
             idCounter.current++;
             
             return (
@@ -75,13 +75,35 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
         <p className={styles.titledev2}>virtual nodes</p>
         <div
           className="dndnode device"
-          onDragStart={(event) => {
-            const uniqueId = `N${idCounter.current++}`;
-            onDragStart(event, 'default', `Delay Node-${uniqueId}`, {}, null, uniqueId);
-          }} 
+          onDragStart={(event) => onDragStart(
+            event,
+            'virtual',
+            `Timer-${idCounter.current++}`,
+            {
+              "speed":{
+                    'type' : 'number'
+                }
+            },
+            null, 
+            idCounter.current
+          )}
           draggable
         >
-          Delay node
+          Timer
+        </div>
+        <div
+          className="dndnode device"
+          onDragStart={(event) => onDragStart(
+            event,
+            'condition',
+            `Condition-${idCounter.current++}`,
+            {},
+            null, 
+            idCounter.current
+          )}
+          draggable
+        >
+          Condition
         </div>
       </div>
     </aside>
