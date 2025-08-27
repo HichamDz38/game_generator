@@ -245,6 +245,17 @@ def save_random_device_config():
                     'value' : 'yes'
                 }
             }
+        },
+        '127.0.0.1:300000': {
+            'device_name': 'Condition-node', 
+            'num_hints': 2,
+            'status': 'active',
+            'config': {
+                "Agree!": {
+                    'type': 'checkbox'
+                }
+            },
+            'node_type': 'condition' 
         }
         }
     redis_client.set("connected_devices", json.dumps(devices_list))

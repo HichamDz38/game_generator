@@ -3,15 +3,18 @@ import styles from './MyComponent.module.css';
 import './style.css'
 import DelayNode from '../components/DelayNode';
 
-function Sidebar({ onLoadScenario , onNodeClick}) {
+function Sidebar({nodeData, onLoadScenario , onNodeClick}) {
   const [devices, setDevices] = useState({});
 
-  const onDragStart = (event, nodeType, label, config) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
-    event.dataTransfer.setData('application/label', label);
-    event.dataTransfer.setData('application/config', JSON.stringify(config));
-    event.dataTransfer.effectAllowed = 'move';
-  };
+  const onDragStart = (event, nodeType, label, config, deviceData = null) => {
+  event.dataTransfer.setData('application/reactflow', nodeType);
+  event.dataTransfer.setData('application/label', label);
+  event.dataTransfer.setData('application/config', JSON.stringify(config));
+  if (deviceData) {
+    event.dataTransfer.setData('application/deviceData', JSON.stringify(deviceData));
+  }
+  event.dataTransfer.effectAllowed = 'move';
+};
 
   const fetchDevices = async () => {
     try {
@@ -46,11 +49,13 @@ function Sidebar({ onLoadScenario , onNodeClick}) {
             <div
               key={deviceId}
               className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`, deviceData.config)}
+              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`, deviceData.config, deviceData)}
               draggable
             >
-              {deviceData.device_name} - {deviceId}
+              {deviceData.device_name} - {deviceId} 
+              
             </div>
+            
           ))
         ) : (
           <div className="no-devices">No devices connected</div>

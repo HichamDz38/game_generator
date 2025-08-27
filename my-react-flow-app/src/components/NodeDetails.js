@@ -1,11 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
+import { Background } from 'reactflow';
 
-function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
+function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }) {
   const containerRef = useRef(null);
   const [imagePreviews, setImagePreviews] = useState({});
   const [uploading, setUploading] = useState({});
   const [uploadStatus, setUploadStatus] = useState({});
+  const [connectedSources, setConnectedSources] = useState([]);
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {
@@ -22,7 +24,36 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
       });
       setImagePreviews(previews);
     }
-  }, [nodeData]);
+
+    if (nodeData && nodeData.data?.deviceType === 'condition') {
+      const sourceNodeIds = edges
+        .filter(edge => edge.target === nodeData.id)
+        .map(edge => edge.source);
+      
+      const sourceNodes = nodes.filter(node => 
+        sourceNodeIds.includes(node.id) && 
+        node.type !== 'input'
+      );
+      
+      setConnectedSources(sourceNodes);
+
+      if (nodeData.data.config) {
+        console.log("____________________________");
+        sourceNodes.forEach(sourceNode => {
+          const checkboxKey = `source_${sourceNode.id}`;
+          console.log(sourceNode.data.label);
+          if (!nodeData.data.config[checkboxKey]) {
+            nodeData.data.config[checkboxKey] = {
+              type: 'checkbox',
+              value: false,
+              sourceNodeId: sourceNode.id,
+              sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
+            };
+          }
+        });
+      }
+    }
+  }, [nodeData, nodes, edges]);
 
   if (!nodeData) return null;
 
@@ -86,7 +117,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
     formElements.forEach(element => {
       if (element.type !== 'file') {
         if (element.type === 'checkbox') {
-          nodeData.data.config[element.name].value = element.checked ? 'yes' : 'no';
+          nodeData.data.config[element.name].value = element.checked;
         } else {
           nodeData.data.config[element.name].value = element.value;
         }
@@ -132,9 +163,54 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
       <div className={styles.nodeDetailsContent}>
         <p><strong>Name:</strong> {nodeData.data?.label}</p>
         <p><strong>Type:</strong> {nodeData.type}</p>
+        
+        {nodeData.data?.deviceType === 'condition' && connectedSources.length > 0 && (
+          <div className={styles.connectedSources}>
+            <h4>Connected Source Nodes:</h4>
+            {connectedSources.map(sourceNode => {
+              const checkboxKey = `source_${sourceNode.id}`;
+              const config = nodeData.data.config[checkboxKey] || {
+                type: 'checkbox',
+                value: false,
+                sourceNodeId: sourceNode.id,
+                sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
+              };
+              
+              return (
+                <div key={sourceNode.id} className={styles.sourceCheckbox}>
+                  <label className={styles.sourcenode}>
+                    <input
+                      type="checkbox"
+                      name={checkboxKey}
+                      defaultChecked={config.value === true || config.value === 'true'}
+                      onChange={(e) => {
+                        if (!nodeData.data.config[checkboxKey]) {
+                          nodeData.data.config[checkboxKey] = {
+                            type: 'checkbox',
+                            value: e.target.checked,
+                            sourceNodeId: sourceNode.id,
+                            sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
+                          };
+                        } else {
+                          nodeData.data.config[checkboxKey].value = e.target.checked;
+                        }
+                      }}
+                    />
+                    {`${sourceNode.data.label}/${sourceNode.id}`}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className={styles.nodeDetailsConfig}>
           {Object.keys(nodeData.data.config).map((item) => {
             const value = nodeData.data.config[item];
+            if (item.startsWith('source_')) {
+              return null;
+            }
+
             return (
               <div key={item}>
                 <label>
@@ -172,14 +248,14 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName }) {
                           </div>
                         )}
                       </div>
-                      ) : value.type === "checkbox" ? (
+                    ) : value.type === "checkbox" ? (
                       <div>
-                        <label >
+                        <label>
                           <input 
                             type={value.type}
                             name={item} 
-                            defaultChecked={value.value === 'yes' || value.value === true}
-                            value={value.value || 'yes'}
+                            defaultChecked={value.value === true || value.value === 'true'}
+                            value={value.value || true}
                           />
                         </label>
                       </div>

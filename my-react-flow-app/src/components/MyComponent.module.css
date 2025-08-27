@@ -462,3 +462,7 @@ select {
 .hiddenFileInput {
   display: none;
 }
+
+.sourcenode {
+  color: black;
+}

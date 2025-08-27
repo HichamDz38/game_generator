@@ -18,7 +18,7 @@ import axios from 'axios';
 import Sidebar from './sidebar';
 import './style.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = '';
 
 const nodeTypes = {
   delay: DelayNode,
@@ -41,11 +41,11 @@ const initialNodes = [
   },
 ];
 
+var idnumber = 0;
+const getId = () => `N${idnumber}`;
 
-const getId = () => `dndnode_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-
-const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
+const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -106,6 +106,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
   const type = event.dataTransfer.getData('application/reactflow');
   const label = event.dataTransfer.getData('application/label');
   const config = JSON.parse(event.dataTransfer.getData('application/config'));
+  const deviceDataStr = event.dataTransfer.getData('application/deviceData');
+  const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
 
   if (typeof type === 'undefined' || !type) return;
 
@@ -113,17 +115,20 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
     x: event.clientX,
     y: event.clientY,
   });
-  
+  idnumber = idnumber + 1;
   const newNode = {
     id: getId(),
     type: type === 'device' ? 'default' : type, 
     position,
     data: { 
       label: label || `${type} node`,
-      deviceType: type === 'device' ? 'device' : type,
+      deviceType: type === 'device' ? 
+        (deviceData?.node_type || 'device') : 
+        type,
       config: config 
     },
   };
+  
 
   setNodes((nds) => nds.concat(newNode));
 }, [rfInstance, isEditable, setNodes]);
@@ -441,6 +446,8 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
             onClose={closeNodeDetails}
             onUpdate={updateNodeData}
             scenarioName={currentScenarioName}
+            nodes={nodes}
+            edges={edges}
           />
         )}
         
@@ -450,6 +457,3 @@ const DnDFlow = ({ scenarioToLoad, onScenarioSaved }) => {
 };
 
 export default DnDFlow;
-
-
-

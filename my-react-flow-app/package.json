@@ -32,7 +32,7 @@
     "format": "prettier --write \"src/**/*.{js,jsx,json,css,scss}\"",
     "lint": "eslint \"src/**/*.{js,jsx}\" --fix"
   },
-  "proxy": "http://192.168.0.104:5000",
+  "proxy": "http://localhost:5000",
   "eslintConfig": {
     "extends": [
       "react-app",
