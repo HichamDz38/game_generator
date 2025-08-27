@@ -2,7 +2,6 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import { deleteScenario } from '../components/deleteScenario';
 import NodeDetails from '../components/NodeDetails';
-import DelayNode from '../components/DelayNode';
 import ReactFlow, {
   ReactFlowProvider,
   addEdge,
@@ -100,38 +99,47 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 
 
   const onDrop = useCallback((event) => {
-  if (!isEditable) return;
+    if (!isEditable) return;
+    
+    event.preventDefault();
+    const type = event.dataTransfer.getData('application/reactflow');
+    const label = event.dataTransfer.getData('application/label');
+    const config = JSON.parse(event.dataTransfer.getData('application/config'));
+    const deviceDataStr = event.dataTransfer.getData('application/deviceData');
+    const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
+    const deviceId = event.dataTransfer.getData('application/deviceId'); 
+
+    if (typeof type === 'undefined' || !type) return;
+
+    const position = rfInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+    
+    const newNodeId = deviceId || getId();
+    
+    if (!deviceId) {
+      idnumber = idnumber + 1;
+    }
+
+    const newNode = {
+      id: newNodeId,
+      type: type === 'device' ? 'default' : type, 
+      position,
+      data: { 
+        label: label || `${type} node`,
+        deviceType: type === 'device' ? 
+          (deviceData?.node_type || 'device') : 
+          type,
+        config: config,
+        originalDeviceId: deviceData ? Object.keys(deviceData)[0] : null 
+      },
+    };
+    
+    setNodes((nds) => nds.concat(newNode));
+  }, [rfInstance, isEditable, setNodes]);
   
-  event.preventDefault();
-  const type = event.dataTransfer.getData('application/reactflow');
-  const label = event.dataTransfer.getData('application/label');
-  const config = JSON.parse(event.dataTransfer.getData('application/config'));
-  const deviceDataStr = event.dataTransfer.getData('application/deviceData');
-  const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
 
-  if (typeof type === 'undefined' || !type) return;
-
-  const position = rfInstance.screenToFlowPosition({
-    x: event.clientX,
-    y: event.clientY,
-  });
-  idnumber = idnumber + 1;
-  const newNode = {
-    id: getId(),
-    type: type === 'device' ? 'default' : type, 
-    position,
-    data: { 
-      label: label || `${type} node`,
-      deviceType: type === 'device' ? 
-        (deviceData?.node_type || 'device') : 
-        type,
-      config: config 
-    },
-  };
-  
-
-  setNodes((nds) => nds.concat(newNode));
-}, [rfInstance, isEditable, setNodes]);
 
 
    const validateFlow = () => {

@@ -196,7 +196,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                         }
                       }}
                     />
-                    {`${sourceNode.data.label}/${sourceNode.id}`}
+                    {`${sourceNode.data.label}`}
                   </label>
                 </div>
               );

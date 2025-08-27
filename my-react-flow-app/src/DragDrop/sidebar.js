@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './MyComponent.module.css';
 import './style.css'
-import DelayNode from '../components/DelayNode';
 
-function Sidebar({nodeData, onLoadScenario , onNodeClick}) {
+function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
   const [devices, setDevices] = useState({});
+  const idCounter = useRef(0);
 
-  const onDragStart = (event, nodeType, label, config, deviceData = null) => {
-  event.dataTransfer.setData('application/reactflow', nodeType);
-  event.dataTransfer.setData('application/label', label);
-  event.dataTransfer.setData('application/config', JSON.stringify(config));
-  if (deviceData) {
-    event.dataTransfer.setData('application/deviceData', JSON.stringify(deviceData));
-  }
-  event.dataTransfer.effectAllowed = 'move';
-};
+  const onDragStart = (event, nodeType, label, config, deviceData = null, uniqueId) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.setData('application/label', label);
+    event.dataTransfer.setData('application/config', JSON.stringify(config));
+    event.dataTransfer.setData('application/deviceId', uniqueId); 
+    
+    if (deviceData) {
+      event.dataTransfer.setData('application/deviceData', JSON.stringify(deviceData));
+    }
+    event.dataTransfer.effectAllowed = 'move';
+  };
 
   const fetchDevices = async () => {
     try {
@@ -37,7 +39,6 @@ function Sidebar({nodeData, onLoadScenario , onNodeClick}) {
     fetchDevices();
   }, []);
 
-
   return (
     <aside className="sidebar">
       <div className={styles.sidenav}>
@@ -45,39 +46,44 @@ function Sidebar({nodeData, onLoadScenario , onNodeClick}) {
         <div className={styles.titledev2}>Drag devices to create Scenario</div>
         <br></br><br></br>
         {Object.keys(devices).length > 0 ? (
-          Object.entries(devices).map(([deviceId, deviceData]) => (
-            <div
-              key={deviceId}
-              className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'device', `${deviceData.device_name}-${deviceId}`, deviceData.config, deviceData)}
-              draggable
-            >
-              {deviceData.device_name} - {deviceId} 
-              
-            </div>
+          Object.entries(devices).map(([deviceId, deviceData]) => {
+            const uniqueId = `N${idCounter.current}`;
+            idCounter.current++;
             
-          ))
+            return (
+              <div
+                key={uniqueId}
+                className="dndnode device"
+                onDragStart={(event) => onDragStart(
+                  event, 
+                  'device', 
+                  `${deviceData.device_name}-${deviceId}/${uniqueId}`, 
+                  deviceData.config, 
+                  deviceData,
+                  uniqueId
+                )}
+                draggable
+              >
+                {deviceData.device_name} - {deviceId}
+              </div>
+            );
+          })
         ) : (
           <div className="no-devices">No devices connected</div>
-          
         )}
         <br></br><br></br>
         <p className={styles.titledev2}>virtual nodes</p>
-          <div
-              className="dndnode device"
-              onDragStart={(event) => onDragStart(event, 'default', 'Delay Node')} 
-              draggable
-            >
-              Delay node
-            </div>
-        <div>
-        
+        <div
+          className="dndnode device"
+          onDragStart={(event) => {
+            const uniqueId = `N${idCounter.current++}`;
+            onDragStart(event, 'default', `Delay Node-${uniqueId}`, {}, null, uniqueId);
+          }} 
+          draggable
+        >
+          Delay node
+        </div>
       </div>
-
-      </div>
-
-      
-
     </aside>
   );
 }
