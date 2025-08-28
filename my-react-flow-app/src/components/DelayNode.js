@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 
@@ -15,6 +14,13 @@ const DelayNode = ({ data, isConnectable, selected }) => {
       }
     }
   }, [data?.delaySeconds, isRunning]);
+
+  useEffect(() => {
+    if (data?.remainingTime !== undefined) {
+      setTimeRemaining(data.remainingTime);
+      setIsRunning(data.remainingTime > 0);
+    }
+  }, [data?.remainingTime]);
 
   useEffect(() => {
     let intervalId;
@@ -63,7 +69,8 @@ const DelayNode = ({ data, isConnectable, selected }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-
+  const displayTime = data?.remainingTime !== undefined ? data.remainingTime : timeRemaining;
+  const showCountdown = isRunning || data?.remainingTime !== undefined;
 
   return (
     <div>
@@ -73,24 +80,82 @@ const DelayNode = ({ data, isConnectable, selected }) => {
         isConnectable={isConnectable}
       />
       
-      <div style={{ textAlign: 'center' }}>
-        <div>
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '10px',
+        minWidth: '120px',
+        backgroundColor: data?.remainingTime !== undefined ? '#ffeb3b' : 'white'
+      }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
           Delay Node
         </div>
         
-        {/* <div>
-          {formatTime(timeRemaining)}
-        </div> */}
-        {/* <div>
-            <button onClick={startDelay} disabled={originalDelay <= 0}>
-                S
-            </button>
-            <button onClick={resetDelay}>
-                R
-            </button>
-        </div> */}
+        {showCountdown && (
+          <div style={{ 
+            fontSize: '18px', 
+            fontWeight: 'bold', 
+            color: '#ff5722',
+            marginBottom: '5px'
+          }}>
+            {formatTime(displayTime)}
+          </div>
+        )}
 
+        {!showCountdown && originalDelay > 0 && (
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#666',
+            marginBottom: '5px'
+          }}>
+            Delay: {formatTime(originalDelay)}
+          </div>
+        )}
+
+        {!data?.remainingTime && (
+          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+            <button 
+              onClick={startDelay} 
+              disabled={originalDelay <= 0 || isRunning}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: isRunning ? '#ccc' : '#4caf50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: isRunning ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isRunning ? 'Running' : 'Start'}
+            </button>
+            <button 
+              onClick={resetDelay}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: '#ff9800',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        )}
+
+        {data?.remainingTime !== undefined && (
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#ff5722',
+            fontWeight: 'bold'
+          }}>
+            Flow Executing...
+          </div>
+        )}
       </div>
+      
       <Handle
         type="source"
         position={Position.Bottom}

@@ -6,6 +6,12 @@ import json
 from werkzeug.utils import secure_filename
 import datetime
 import uuid
+import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 
@@ -301,6 +307,29 @@ def upload_image():
 @app.route('/static/uploads/<path:filename>')
 def serve_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/execute_device', methods=['POST'])
+def execute_device():
+    try:
+        data = request.get_json()
+        
+        device_id = data.get('deviceId')
+        config = data.get('config', {})
+        node_id = data.get('nodeId')
+        scenario_name = data.get('scenarioName')
+        
+        logger.info(f"Executing device {device_id} for node {node_id} in scenario {scenario_name}")
+        logger.info(f"Device config: {config}")
+        
+        
+    except Exception as e:
+        logger.error(f"Error executing device: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Device execution failed: {str(e)}',
+            'deviceId': data.get('deviceId') if data else None,
+            'nodeId': data.get('nodeId') if data else None
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
