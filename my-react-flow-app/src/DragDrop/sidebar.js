@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './MyComponent.module.css';
 import './style.css'
+import DelayNode from '../components/DelayNode';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 function Sidebar({nodeData, onLoadScenario  , onNodeClick}) {
   const [devices, setDevices] = useState({});
@@ -20,7 +23,7 @@ function Sidebar({nodeData, onLoadScenario  , onNodeClick}) {
 
   const fetchDevices = async () => {
     try {
-      const response = await fetch('/get_devices');
+      const response = await fetch(`${API_BASE_URL}/get_devices`);
       if (response.ok) {
         const devicesData = await response.text();
         try {
@@ -109,5 +112,7 @@ function Sidebar({nodeData, onLoadScenario  , onNodeClick}) {
     </aside>
   );
 }
+
+//"proxy": "http://localhost:5000",
 
 export default Sidebar;

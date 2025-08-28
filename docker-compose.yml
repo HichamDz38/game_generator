@@ -20,6 +20,8 @@ services:
       - redis
     environment:
       - FLASK_ENV=production
+    env_file:
+      - /home/aminedachir/Documents/static_web/my-react-flow-app/.env
    
   frontend:
     build:
@@ -33,14 +35,5 @@ services:
       - /app/node_modules
     depends_on:
       - gamepanel
-    environment:
-      - REACT_APP_API_URL=http://localhost:5000
-
-  # game:
-  #   build:
-  #     context: ./game
-  #     dockerfile: Dockerfile
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - redis
-  #   command: python game_server.py
+    env_file:
+      - /home/aminedachir/Documents/static_web/my-react-flow-app/.env

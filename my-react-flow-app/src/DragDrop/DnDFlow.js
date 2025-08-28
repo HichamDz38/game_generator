@@ -17,7 +17,7 @@ import axios from 'axios';
 import Sidebar from './sidebar';
 import './style.css';
 
-const API_BASE_URL = '';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const nodeTypes = {
   delay: DelayNode,
@@ -244,7 +244,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           "name": currentScenarioName
         };
         
-        await axios.post('/save_flow', data);
+        await axios.post(`${API_BASE_URL}/save_flow`, data);
         return true;
         
       } catch (error) {
@@ -261,7 +261,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           "name": SC_Name
         };
         
-        await axios.post('/save_flow', data);
+        await axios.post(`${API_BASE_URL}/save_flow`, data);
         setCurrentScenarioName(SC_Name);
         
         if (onScenarioSaved) {
@@ -275,7 +275,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 
   const loadFlowFromBackend = useCallback(async (flowId) => {
     try {
-      const response = await axios.get(`/load-flow/${flowId}`);
+      const response = await axios.get(`${API_BASE_URL}/load-flow/${flowId}`);
       
       if (response.data.error) {
         throw new Error(response.data.error);
@@ -324,7 +324,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
         name: newScenarioName
       };
 
-      const response = await axios.post('/save_flow', data);
+      const response = await axios.post(`${API_BASE_URL}/save_flow`, data);
       
       if (response.status === 200) {
         setCurrentScenarioName(newScenarioName);

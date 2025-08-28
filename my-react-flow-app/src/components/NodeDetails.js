@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import styles from './MyComponent.module.css';
 import { Background } from 'reactflow';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }) {
   const containerRef = useRef(null);
   const [imagePreviews, setImagePreviews] = useState({});
@@ -81,7 +83,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
       formData.append('scenarioName', scenarioName);
       formData.append('fieldName', fieldName);
 
-      const response = await fetch('/upload-image', {
+      const response = await fetch(`${API_BASE_URL}/upload-image`, {
         method: 'POST',
         body: formData,
       });

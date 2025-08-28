@@ -1,4 +1,7 @@
 import axios from 'axios'
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 export const deleteScenario = async (
     currentScenarioName,
     setCurrentScenarioName,
@@ -13,7 +16,7 @@ export const deleteScenario = async (
 
   if (window.confirm(`Are you sure "${currentScenarioName}"?`)) {
       try {
-        await axios.delete(`/delete_scenario/${currentScenarioName}`);
+        await axios.delete(`${API_BASE_URL}/delete_scenario/${currentScenarioName}`);
         alert('Scenario deleted ');
         setCurrentScenarioName('');
         setNodes([]);

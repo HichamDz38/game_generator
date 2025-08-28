@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef  } from 'react';
 import styles from './MyComponent.module.css';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {  
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,7 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/flow_scenarios');
+      const response = await fetch(`${API_BASE_URL}/flow_scenarios`);
       if (!response.ok) {
         throw new Error('response problem');
       }
