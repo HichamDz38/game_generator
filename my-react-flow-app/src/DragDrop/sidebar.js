@@ -80,10 +80,10 @@ function Sidebar({nodeData, onLoadScenario  , onNodeClick}) {
           className="dndnode device"
           onDragStart={(event) => onDragStart(
             event,
-            'virtual',
+            'Timer',
             `Timer-${idCounter.current++}`,
             {
-              "speed":{
+              "seconds":{
                     'type' : 'number'
                 }
             },
