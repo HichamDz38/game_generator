@@ -677,6 +677,12 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
               STOP
             </button>
           )}
+
+          {!isEditable && executionState.isRunning && (
+            <button className={styles.theme__button}>
+              SKIP
+            </button>
+          )}
           
           {isEditable && (
             <button className={styles.theme__button} onClick={handleSaveAsAndStayEditable}>
