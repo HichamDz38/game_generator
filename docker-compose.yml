@@ -21,7 +21,7 @@ services:
     environment:
       - FLASK_ENV=production
     env_file:
-      - /home/aminedachir/Documents/static_web/my-react-flow-app/.env
+      - .env
    
   frontend:
     build:
@@ -36,4 +36,4 @@ services:
     depends_on:
       - gamepanel
     env_file:
-      - /home/aminedachir/Documents/static_web/my-react-flow-app/.env
+      - .env
