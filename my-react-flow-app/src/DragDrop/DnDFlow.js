@@ -69,6 +69,10 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   }, []);
 
   const executeNode = async (node, pathId = null) => {
+    if (executionState.shouldStop) {
+      throw new Error(`Flow execution stopped due to: ${executionState.globalError}`);
+    }
+    
     console.log(`Executing node: ${node.id} - ${node.data.label} (Path: ${pathId})`);
     
     updateExecutionState(prev => ({
@@ -161,7 +165,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const { config, originalDeviceId } = node.data;
   
   try {
-    // Call the combined start route (which now includes execute_device functionality)
     const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,7 +182,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     const result = await response.json();
     console.log('Device start result:', result);
     
-    // Poll for device status until completed or failed
     let status = 'in progress';
     let attempts = 0;
     const maxAttempts = 300;
@@ -194,7 +196,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           const statusData = await statusResponse.json();
           status = statusData.status;
           
-          // Update node visual feedback
           setNodes(nds => nds.map(n => {
             if (n.id === node.id) {
               let backgroundColor, borderColor;
