@@ -156,37 +156,60 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const executeDeviceNode = async (node) => {
-    const { config, originalDeviceId } = node.data;
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/execute_device`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId: originalDeviceId,
-          config: config,
-          nodeId: node.id,
-          scenarioName: currentScenarioName
-        })
-      });
+  const { config, originalDeviceId } = node.data;
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/execute_device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deviceId: originalDeviceId,
+        config: config,
+        nodeId: node.id,
+        scenarioName: currentScenarioName
+      })
+    });
 
-      if (!response.ok) {
-        throw new Error(`Device execution failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Device execution result:', result);
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      return result;
-    } catch (error) {
-      console.error('Device execution error:', error);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Simulated device execution for:', node.data.label);
-      return { status: 'simulated' };
+    if (!response.ok) {
+      throw new Error(`Device execution failed: ${response.statusText}`);
     }
-  };
+
+    const result = await response.json();
+    console.log('Device execution result:', result);
+    
+    let status = 'in progress';
+    let attempts = 0;
+    const maxAttempts = 60; 
+    
+    while (status === 'in progress' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        status = statusData.status;
+        
+        if (status === 'completed') {
+          console.log(`Device ${originalDeviceId} completed successfully`);
+          break;
+        } else if (status === 'failed') {
+          throw new Error(`Device ${originalDeviceId} failed`);
+        }
+      }
+      
+      attempts++;
+    }
+    
+    if (status === 'in progress') {
+      throw new Error(`Device ${originalDeviceId} timeout`);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Device execution error:', error);
+    throw error;
+  }
 
   const executeVirtualNode = async (node) => {
     const speed = node.data.config?.speed?.value || 3000;
