@@ -63,16 +63,35 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   shouldStop: false, 
   globalError: null   
 });
+const isRunningRef = useRef(false);
+
+  // Update ref whenever executionState changes
+  useEffect(() => {
+    isRunningRef.current = executionState.isRunning;
+  }, [executionState.isRunning]);
 
   const updateExecutionState = useCallback((updater) => {
     setExecutionState(prev => updater(prev));
   }, []);
 
-  const executeNode = async (node, pathId = null) => {
-    if (executionState.shouldStop) {
-      throw new Error(`Flow execution stopped due to: ${executionState.globalError}`);
+  // Transform config from nested format to simple key:value
+  const transformConfigForDevice = (config) => {
+    const transformedConfig = {};
+    
+    for (const [key, configObj] of Object.entries(config)) {
+      if (configObj && typeof configObj === 'object' && 'value' in configObj) {
+        transformedConfig[key] = configObj.value;
+      } else {
+        transformedConfig[key] = configObj;
+      }
     }
     
+    console.log('Original config:', config);
+    console.log('Transformed config:', transformedConfig);
+    return transformedConfig;
+  };
+
+  const executeNode = async (node, pathId = null) => {
     console.log(`Executing node: ${node.id} - ${node.data.label} (Path: ${pathId})`);
     
     updateExecutionState(prev => ({
@@ -111,18 +130,18 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
       }
 
       updateExecutionState(prev => ({
-      ...prev,
-      completedNodes: [...prev.completedNodes, node.id],
-      currentNodes: prev.currentNodes.filter(id => id !== node.id),
-      executionLog: [...prev.executionLog, {
-        type: 'success',
-        nodeId: node.id,
-        nodeName: node.data.label,
-        timestamp: new Date(),
-        message: `Successfully executed ${node.data.label}`,
-        pathId: pathId
-      }]
-    }));
+        ...prev,
+        completedNodes: [...prev.completedNodes, node.id],
+        currentNodes: prev.currentNodes.filter(id => id !== node.id),
+        executionLog: [...prev.executionLog, {
+          type: 'success',
+          nodeId: node.id,
+          nodeName: node.data.label,
+          timestamp: new Date(),
+          message: `Successfully executed ${node.data.label}`,
+          pathId: pathId
+        }]
+      }));
 
       setNodes(nds => nds.map(n => ({
         ...n,
@@ -137,109 +156,154 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
       console.error(`Error executing node ${node.id}:`, error);
       
       updateExecutionState(prev => ({
-      ...prev,
-      shouldStop: true,
-      globalError: `Node "${node.data.label}" failed: ${error.message}`,
-      failedNodes: [...prev.failedNodes, node.id],
-      currentNodes: prev.currentNodes.filter(id => id !== node.id),
-      executionLog: [...prev.executionLog, {
-        type: 'error',
-        nodeId: node.id,
-        nodeName: node.data.label,
-        timestamp: new Date(),
-        message: `Failed to execute ${node.data.label}: ${error.message}`,
-        pathId: pathId
-      }]
-    }));
+        ...prev,
+        failedNodes: [...prev.failedNodes, node.id],
+        currentNodes: prev.currentNodes.filter(id => id !== node.id),
+        executionLog: [...prev.executionLog, {
+          type: 'error',
+          nodeId: node.id,
+          nodeName: node.data.label,
+          timestamp: new Date(),
+          message: `Failed to execute ${node.data.label}: ${error.message}`,
+          pathId: pathId
+        }]
+      }));
 
       setNodes(nds => nds.map(n => ({
-      ...n,
-      style: n.id === node.id 
-        ? { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
-        : n.style
-    })));
+        ...n,
+        style: n.id === node.id 
+          ? { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
+          : n.style
+      })));
 
-    throw error; 
-  }
-};
+      throw error;
+    }
+  };
 
   const executeDeviceNode = async (node, pathId = null) => {
-  const { config, originalDeviceId } = node.data;
-  
-  try {
-    // Start the device
-    const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        config: config,
-        nodeId: node.id,
-        scenarioName: currentScenarioName
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Device start failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    console.log('Device start result:', result);
+    const { config, originalDeviceId } = node.data;
     
-    // Poll for device status
-    let status = 'in progress';
-    let attempts = 0;
-    const maxAttempts = 300;
-    const pollInterval = 1000;
-    
-    while (status === 'in progress' && attempts < maxAttempts) {
-      // Check if execution was stopped by user
-      if (!executionState.isRunning) {
-        throw new Error('Execution was stopped by user');
+    try {
+      // Transform config to simple key:value format
+      const transformedConfig = transformConfigForDevice(config);
+      
+      // Start the device
+      const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: transformedConfig, // Send transformed config
+          nodeId: node.id,
+          scenarioName: currentScenarioName
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Device start failed: ${response.statusText}`);
       }
+
+      const result = await response.json();
+      console.log('Device start result:', result);
       
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      // Poll for device status
+      let status = 'in progress';
+      let attempts = 0;
+      const maxAttempts = 300;
+      const pollInterval = 1000;
       
-      try {
-        const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json();
-          status = statusData.status;
-          
-          console.log(`Device ${originalDeviceId} status: ${status}`);
-          
-          if (status === 'completed') {
-            console.log(`Device ${originalDeviceId} completed successfully`);
-            return result;
-          } else if (status === 'failed') {
-            // IMMEDIATE STOP - throw error that will stop entire flow
-            throw new Error(`Device failed`);
+      while (status === 'in progress' && attempts < maxAttempts) {
+        // Check if execution was stopped using ref for immediate access
+        if (!isRunningRef.current) {
+          console.log('Execution was stopped - breaking polling loop');
+          throw new Error('Execution was stopped by user');
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            status = statusData.status;
+            
+            console.log(`Device ${originalDeviceId} status: ${status} (attempt ${attempts})`);
+            
+            // Update visual feedback based on status
+            setNodes(nds => nds.map(n => {
+              if (n.id === node.id) {
+                let backgroundColor, borderColor;
+                
+                switch (status) {
+                  case 'in progress':
+                    backgroundColor = '#ffeb3b';
+                    borderColor = '#ff9800';
+                    break;
+                  case 'completed':
+                    backgroundColor = '#4caf50';
+                    borderColor = '#2e7d32';
+                    break;
+                  case 'failed':
+                    backgroundColor = '#f44336';
+                    borderColor = '#d32f2f';
+                    break;
+                  default:
+                    backgroundColor = '#ffeb3b';
+                    borderColor = '#ff9800';
+                }
+                
+                return {
+                  ...n,
+                  style: { ...n.style, backgroundColor, border: `2px solid ${borderColor}` }
+                };
+              }
+              return n;
+            }));
+            
+            if (status === 'completed') {
+              console.log(`Device ${originalDeviceId} completed successfully`);
+              return result;
+            } else if (status === 'failed') {
+              // Device failed - stop entire flow
+              throw new Error('Device failed');
+            }
           }
+        } catch (statusError) {
+          if (statusError.message === 'Device failed') {
+            throw statusError; // Re-throw device failure immediately
+          }
+          console.warn(`Status check failed for device ${originalDeviceId}:`, statusError);
         }
-      } catch (error) {
-        if (error.message === 'Device failed') {
-          throw error; // Re-throw device failure immediately
+        
+        attempts++;
+        
+        if (attempts % 10 === 0) {
+          console.log(`Waiting for device ${originalDeviceId}... (${attempts}s elapsed)`);
         }
-        console.warn(`Status check failed for device ${originalDeviceId}:`, error);
       }
       
-      attempts++;
-      
-      if (attempts % 10 === 0) {
-        console.log(`Waiting for device ${originalDeviceId}... (${attempts}s elapsed)`);
+      if (status === 'in progress') {
+        throw new Error(`Device ${originalDeviceId} timeout after ${maxAttempts} seconds`);
       }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('Device execution error:', error);
+      
+      // Set visual feedback for failed node
+      setNodes(nds => nds.map(n => {
+        if (n.id === node.id) {
+          return {
+            ...n,
+            style: { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
+          };
+        }
+        return n;
+      }));
+      
+      throw error;
     }
-    
-    if (status === 'in progress') {
-      throw new Error(`Device ${originalDeviceId} timeout after ${maxAttempts} seconds`);
-    }
-    
-    return result;
-    
-  } catch (error) {
-    console.error('Device execution error:', error);
-    throw error; 
-  }
-};
+  };
 
   const executeVirtualNode = async (node) => {
     const speed = node.data.config?.speed?.value || 3000;
@@ -252,6 +316,11 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     console.log(`Delay node waiting for ${delaySeconds} seconds`);
     
     for (let i = delaySeconds; i > 0; i--) {
+      // Check if execution was stopped during delay
+      if (!isRunningRef.current) {
+        throw new Error('Execution was stopped by user');
+      }
+      
       setNodes(nds => nds.map(n => ({
         ...n,
         data: n.id === node.id 
@@ -299,6 +368,11 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     const maxAttempts = 120; 
     
     while (attempts < maxAttempts) {
+      // Check if execution was stopped
+      if (!isRunningRef.current) {
+        throw new Error('Execution was stopped by user');
+      }
+      
       const currentState = executionState;
       const currentCompleted = currentState.completedNodes;
       const currentFailed = currentState.failedNodes;
@@ -331,10 +405,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
         break;
       }
       
-      if (!currentState.isRunning) {
-        throw new Error('Execution was stopped while waiting for source nodes');
-      }
-      
       await new Promise(resolve => setTimeout(resolve, 1000));
       attempts++;
       
@@ -364,181 +434,171 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const traverseFlow = async (startNodeId, pathId = null) => {
-  if (!pathId) {
-    pathId = generatePathId();
-    updateExecutionState(prev => ({
-      ...prev,
-      activePaths: new Set([...prev.activePaths, pathId])
-    }));
-  }
-
-  // Check global stop flag
-  if (executionState.shouldStop) {
-    console.log(`Path ${pathId} stopped due to global stop flag`);
-    updateExecutionState(prev => ({
-      ...prev,
-      activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
-    }));
-    throw new Error(`Flow execution stopped: ${executionState.globalError}`);
-  }
-
-  const startNode = nodes.find(node => node.id === startNodeId);
-  if (!startNode) {
-    console.error(`Node with id ${startNodeId} not found`);
-    return;
-  }
-
-  try {
-    await executeNode(startNode, pathId);
-    
-    // Check again after node execution
-    if (executionState.shouldStop) {
-      throw new Error(`Flow execution stopped: ${executionState.globalError}`);
-    }
-    
-    const nextNodes = getNextNodes(startNodeId);
-    
-    if (nextNodes.length === 0) {
-      console.log(`Path ${pathId} completed - no more nodes from ${startNode.data.label}`);
+    if (!pathId) {
+      pathId = generatePathId();
       updateExecutionState(prev => ({
         ...prev,
-        activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+        activePaths: new Set([...prev.activePaths, pathId])
       }));
+    }
+
+    const startNode = nodes.find(node => node.id === startNodeId);
+    if (!startNode) {
+      console.error(`Node with id ${startNodeId} not found`);
       return;
     }
 
-    if (nextNodes.length === 1) {
-      const nextNode = nextNodes[0];
-      await traverseFlow(nextNode.id, pathId);
-    } else {
-      console.log(`Branching into ${nextNodes.length} paths from ${startNode.data.label}`);
+    try {
+      await executeNode(startNode, pathId);
       
-      const branchPromises = [];
+      const nextNodes = getNextNodes(startNodeId);
       
-      nextNodes.forEach((nextNode, index) => {
-        const branchPathId = `${pathId}_branch_${index}`;
+      if (nextNodes.length === 0) {
+        console.log(`Path ${pathId} completed - no more nodes from ${startNode.data.label}`);
         updateExecutionState(prev => ({
           ...prev,
-          activePaths: new Set([...prev.activePaths, branchPathId])
+          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
         }));
-        branchPromises.push(traverseFlow(nextNode.id, branchPathId));
-      });
+        return;
+      }
 
-      // Use Promise.race with a stop condition instead of allSettled
-      const stopPromise = new Promise((_, reject) => {
-        const checkStop = () => {
-          if (executionState.shouldStop) {
-            reject(new Error(`Flow execution stopped: ${executionState.globalError}`));
-          } else {
-            setTimeout(checkStop, 100); // Check every 100ms
-          }
-        };
-        checkStop();
-      });
+      if (nextNodes.length === 1) {
+        const nextNode = nextNodes[0];
+        
+        if (nextNode.data.deviceType === 'condition') {
+          console.log(`Approaching condition node: ${nextNode.data.label}`);
+          
+          await traverseFlow(nextNode.id, pathId);
+        } else {
+          await traverseFlow(nextNode.id, pathId);
+        }
+      } else {
+        console.log(`Branching into ${nextNodes.length} paths from ${startNode.data.label}`);
+        const conditionNodes = nextNodes.filter(node => node.data.deviceType === 'condition');
+        const regularNodes = nextNodes.filter(node => node.data.deviceType !== 'condition');
+        
+        const branchPromises = [];
+        
+        regularNodes.forEach((nextNode, index) => {
+          const branchPathId = `${pathId}_branch_${index}`;
+          updateExecutionState(prev => ({
+            ...prev,
+            activePaths: new Set([...prev.activePaths, branchPathId])
+          }));
+          branchPromises.push(traverseFlow(nextNode.id, branchPathId));
+        });
+        
+        conditionNodes.forEach((nextNode, index) => {
+          const conditionPathId = `${pathId}_condition_${index}`;
+          updateExecutionState(prev => ({
+            ...prev,
+            activePaths: new Set([...prev.activePaths, conditionPathId])
+          }));
+          branchPromises.push(traverseFlow(nextNode.id, conditionPathId));
+        });
 
-      try {
-        // Race between all branches completing and the stop signal
-        await Promise.race([
-          Promise.all(branchPromises), // All branches must succeed
-          stopPromise // Or stop signal wins
-        ]);
-      } catch (error) {
-        // If any branch fails or stop signal is triggered, cancel all
-        console.error('Branch execution failed, stopping all paths');
-        throw error;
+        // Wait for all branches to complete
+        const results = await Promise.allSettled(branchPromises);
+        
+        const failures = results.filter(result => result.status === 'rejected');
+        if (failures.length > 0) {
+          console.error(`${failures.length} branch(es) failed:`, failures);
+          // Throw the first failure to stop execution
+          throw failures[0].reason;
+        }
+        
+        updateExecutionState(prev => ({
+          ...prev,
+          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+        }));
       }
       
+    } catch (error) {
+      console.error(`Flow traversal error in path ${pathId}:`, error);
       updateExecutionState(prev => ({
         ...prev,
         activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
       }));
+      throw error;
     }
-    
-  } catch (error) {
-    console.error(`Flow traversal error in path ${pathId}:`, error);
-    updateExecutionState(prev => ({
-      ...prev,
-      activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
-    }));
-    throw error;
-  }
-};
+  };
 
   const handleStartExecution = async () => {
-  console.log('Starting flow execution...');
-  
-  setExecutionState({
-    isRunning: true,
-    currentNodes: [],
-    completedNodes: [],
-    failedNodes: [],
-    executionLog: [{
-      type: 'info',
-      message: 'Flow execution started',
-      timestamp: new Date()
-    }],
-    startTime: new Date(),
-    activePaths: new Set()
-  });
-
-  // Reset all node styles
-  setNodes(nds => nds.map(n => ({
-    ...n,
-    style: { ...n.style, backgroundColor: undefined, border: undefined }
-  })));
-
-  try {
-    const startNode = nodes.find(node => node.type === 'input');
-    if (!startNode) {
-      throw new Error('No start node found');
-    }
-
-    await traverseFlow(startNode.id);
+    console.log('Starting flow execution...');
     
-    // If we get here, everything completed successfully
-    updateExecutionState(prev => ({
-      ...prev,
-      isRunning: false,
-      executionLog: [...prev.executionLog, {
-        type: 'success',
-        message: 'Flow execution completed successfully',
-        timestamp: new Date(),
-        duration: new Date() - prev.startTime
-      }]
-    }));
+    setExecutionState({
+      isRunning: true,
+      currentNodes: [],
+      completedNodes: [],
+      failedNodes: [],
+      executionLog: [{
+        type: 'info',
+        message: 'Flow execution started',
+        timestamp: new Date()
+      }],
+      startTime: new Date(),
+      activePaths: new Set()
+    });
 
-    console.log('Flow execution completed successfully');
-    alert('Flow execution completed successfully!');
-
-  } catch (error) {
-    console.error('Flow execution failed:', error);
-    
-    // Stop execution immediately
-    updateExecutionState(prev => ({
-      ...prev,
-      isRunning: false,
-      executionLog: [...prev.executionLog, {
-        type: 'error',
-        message: `Flow execution failed: ${error.message}`,
-        timestamp: new Date(),
-        duration: prev.startTime ? new Date() - prev.startTime : 0
-      }]
-    }));
-
-    // Reset node styles
     setNodes(nds => nds.map(n => ({
       ...n,
       style: { ...n.style, backgroundColor: undefined, border: undefined }
     })));
 
-    // Show specific alert for device failure
-    if (error.message.includes('Device failed')) {
-      alert('Device failed - Flow execution stopped');
-    } else {
-      alert(`Flow execution failed: ${error.message}`);
+    try {
+      const startNode = nodes.find(node => node.type === 'input');
+      if (!startNode) {
+        throw new Error('No start node found');
+      }
+
+      await traverseFlow(startNode.id);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateExecutionState(prev => ({
+        ...prev,
+        isRunning: false,
+        executionLog: [...prev.executionLog, {
+          type: 'success',
+          message: 'Flow execution completed successfully',
+          timestamp: new Date(),
+          duration: new Date() - prev.startTime
+        }]
+      }));
+
+      console.log('Flow execution completed successfully');
+      alert('Flow execution completed successfully!');
+
+    } catch (error) {
+      console.error('Flow execution failed:', error);
+      
+      updateExecutionState(prev => ({
+        ...prev,
+        isRunning: false,
+        activePaths: new Set(), 
+        executionLog: [...prev.executionLog, {
+          type: 'error',
+          message: `Flow execution failed: ${error.message}`,
+          timestamp: new Date(),
+          duration: prev.startTime ? new Date() - prev.startTime : 0
+        }]
+      }));
+
+      setNodes(nds => nds.map(n => ({
+        ...n,
+        style: { ...n.style, backgroundColor: undefined, border: undefined }
+      })));
+
+      // Show specific alert based on error type
+      if (error.message === 'Device failed') {
+        alert('Device failed - Flow execution stopped');
+      } else if (error.message.includes('stopped by user')) {
+        console.log('Flow stopped by user - no alert needed');
+      } else {
+        alert(`Flow execution failed: ${error.message}`);
+      }
     }
-  }
-};
+  };
 
   const handleStopExecution = () => {
     updateExecutionState(prev => ({
