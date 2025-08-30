@@ -65,7 +65,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 });
 const isRunningRef = useRef(false);
 
-  // Update ref whenever executionState changes
   useEffect(() => {
     isRunningRef.current = executionState.isRunning;
   }, [executionState.isRunning]);
@@ -74,7 +73,6 @@ const isRunningRef = useRef(false);
     setExecutionState(prev => updater(prev));
   }, []);
 
-  // Transform config from nested format to simple key:value
   const transformConfigForDevice = (config) => {
     const transformedConfig = {};
     
@@ -184,15 +182,13 @@ const isRunningRef = useRef(false);
     const { config, originalDeviceId } = node.data;
     
     try {
-      // Transform config to simple key:value format
       const transformedConfig = transformConfigForDevice(config);
       
-      // Start the device
       const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          config: transformedConfig, // Send transformed config
+          config: transformedConfig,
           nodeId: node.id,
           scenarioName: currentScenarioName
         })
@@ -205,14 +201,12 @@ const isRunningRef = useRef(false);
       const result = await response.json();
       console.log('Device start result:', result);
       
-      // Poll for device status
       let status = 'in progress';
       let attempts = 0;
       const maxAttempts = 300;
       const pollInterval = 1000;
       
       while (status === 'in progress' && attempts < maxAttempts) {
-        // Check if execution was stopped using ref for immediate access
         if (!isRunningRef.current) {
           console.log('Execution was stopped - breaking polling loop');
           throw new Error('Execution was stopped by user');
@@ -228,7 +222,6 @@ const isRunningRef = useRef(false);
             
             console.log(`Device ${originalDeviceId} status: ${status} (attempt ${attempts})`);
             
-            // Update visual feedback based on status
             setNodes(nds => nds.map(n => {
               if (n.id === node.id) {
                 let backgroundColor, borderColor;
@@ -263,13 +256,12 @@ const isRunningRef = useRef(false);
               console.log(`Device ${originalDeviceId} completed successfully`);
               return result;
             } else if (status === 'failed') {
-              // Device failed - stop entire flow
               throw new Error('Device failed');
             }
           }
         } catch (statusError) {
           if (statusError.message === 'Device failed') {
-            throw statusError; // Re-throw device failure immediately
+            throw statusError; 
           }
           console.warn(`Status check failed for device ${originalDeviceId}:`, statusError);
         }
@@ -290,7 +282,6 @@ const isRunningRef = useRef(false);
     } catch (error) {
       console.error('Device execution error:', error);
       
-      // Set visual feedback for failed node
       setNodes(nds => nds.map(n => {
         if (n.id === node.id) {
           return {
@@ -316,7 +307,6 @@ const isRunningRef = useRef(false);
     console.log(`Delay node waiting for ${delaySeconds} seconds`);
     
     for (let i = delaySeconds; i > 0; i--) {
-      // Check if execution was stopped during delay
       if (!isRunningRef.current) {
         throw new Error('Execution was stopped by user');
       }
@@ -368,7 +358,6 @@ const isRunningRef = useRef(false);
     const maxAttempts = 120; 
     
     while (attempts < maxAttempts) {
-      // Check if execution was stopped
       if (!isRunningRef.current) {
         throw new Error('Execution was stopped by user');
       }
@@ -497,13 +486,11 @@ const isRunningRef = useRef(false);
           branchPromises.push(traverseFlow(nextNode.id, conditionPathId));
         });
 
-        // Wait for all branches to complete
         const results = await Promise.allSettled(branchPromises);
         
         const failures = results.filter(result => result.status === 'rejected');
         if (failures.length > 0) {
           console.error(`${failures.length} branch(es) failed:`, failures);
-          // Throw the first failure to stop execution
           throw failures[0].reason;
         }
         
@@ -589,7 +576,6 @@ const isRunningRef = useRef(false);
         style: { ...n.style, backgroundColor: undefined, border: undefined }
       })));
 
-      // Show specific alert based on error type
       if (error.message === 'Device failed') {
         alert('Device failed - Flow execution stopped');
       } else if (error.message.includes('stopped by user')) {
