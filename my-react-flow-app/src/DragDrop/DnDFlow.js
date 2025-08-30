@@ -23,8 +23,6 @@ const nodeTypes = {
   delay: DelayNode,
 };
 
-
-
 const initialNodes = [
   {
     id: '1',
@@ -43,7 +41,6 @@ const initialNodes = [
 var idnumber = 0;
 const getId = () => `N${idnumber}`;
 
-
 const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -55,24 +52,33 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const [showDelayConfig, setShowDelayConfig] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(!scenarioToLoad);
 
-//start
   const [executionState, setExecutionState] = useState({
     isRunning: false,
     currentNodes: [],
     completedNodes: [],
     failedNodes: [],
     executionLog: [],
-    startTime: null
+    startTime: null,
+    activePaths: new Set() 
   });
 
-  const executeNode = async (node) => {
-    console.log(`Executing node: ${node.id} - ${node.data.label}`);
+  const updateExecutionState = useCallback((updater) => {
+    setExecutionState(prev => updater(prev));
+  }, []);
+
+  const executeNode = async (node, pathId = null) => {
+    console.log(`Executing node: ${node.id} - ${node.data.label} (Path: ${pathId})`);
+    
+    updateExecutionState(prev => ({
+      ...prev,
+      currentNodes: [...prev.currentNodes, node.id]
+    }));
     
     setNodes(nds => nds.map(n => ({
       ...n,
       style: n.id === node.id 
         ? { ...n.style, backgroundColor: '#ffeb3b', border: '2px solid #ff9800' }
-        : { ...n.style, backgroundColor: undefined, border: undefined }
+        : n.style
     })));
 
     try {
@@ -98,7 +104,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      setExecutionState(prev => ({
+      updateExecutionState(prev => ({
         ...prev,
         completedNodes: [...prev.completedNodes, node.id],
         currentNodes: prev.currentNodes.filter(id => id !== node.id),
@@ -107,7 +113,8 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           nodeId: node.id,
           nodeName: node.data.label,
           timestamp: new Date(),
-          message: `Successfully executed ${node.data.label}`
+          message: `Successfully executed ${node.data.label}`,
+          pathId: pathId
         }]
       }));
 
@@ -123,7 +130,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     } catch (error) {
       console.error(`Error executing node ${node.id}:`, error);
       
-      setExecutionState(prev => ({
+      updateExecutionState(prev => ({
         ...prev,
         failedNodes: [...prev.failedNodes, node.id],
         currentNodes: prev.currentNodes.filter(id => id !== node.id),
@@ -132,7 +139,8 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           nodeId: node.id,
           nodeName: node.data.label,
           timestamp: new Date(),
-          message: `Failed to execute ${node.data.label}: ${error.message}`
+          message: `Failed to execute ${node.data.label}: ${error.message}`,
+          pathId: pathId
         }]
       }));
 
@@ -209,21 +217,87 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 
   const executeConditionNode = async (node) => {
     const { config } = node.data;
-    const checkedSources = Object.keys(config)
-      .filter(key => key.startsWith('source_') && config[key].value === true)
-      .map(key => config[key].sourceNodeId);
     
-    console.log('Condition node checking sources:', checkedSources);
-    console.log('Completed nodes:', executionState.completedNodes);
+    const sourceConfigs = Object.keys(config)
+      .filter(key => key.startsWith('source_'))
+      .map(key => ({
+        key,
+        sourceNodeId: config[key].sourceNodeId,
+        isChecked: config[key].value === true
+      }));
     
-    const allSourcesCompleted = checkedSources.every(sourceId => 
-      executionState.completedNodes.includes(sourceId)
-    );
+    const checkedSources = sourceConfigs
+      .filter(source => source.isChecked)
+      .map(source => source.sourceNodeId);
     
-    if (!allSourcesCompleted) {
-      throw new Error('Not all required source nodes are completed');
+    console.log('Condition node analysis:');
+    console.log('- All source configs:', sourceConfigs);
+    console.log('- Checked sources (must complete):', checkedSources);
+    
+    if (checkedSources.length === 0) {
+      console.log('No sources checked - condition node passes immediately');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
     }
     
+    console.log(`Waiting for ${checkedSources.length} checked source(s) to complete...`);
+    
+    let attempts = 0;
+    const maxAttempts = 120; 
+    
+    while (attempts < maxAttempts) {
+      const currentState = executionState;
+      const currentCompleted = currentState.completedNodes;
+      const currentFailed = currentState.failedNodes;
+      
+      const anySourceFailed = checkedSources.some(sourceId => 
+        currentFailed.includes(sourceId)
+      );
+      
+      if (anySourceFailed) {
+        const failedSources = checkedSources.filter(sourceId => 
+          currentFailed.includes(sourceId)
+        );
+        throw new Error(`Required source node(s) failed: ${failedSources.join(', ')}`);
+      }
+      
+      const completedSources = checkedSources.filter(sourceId => 
+        currentCompleted.includes(sourceId)
+      );
+      
+      const allRequiredSourcesCompleted = checkedSources.every(sourceId => 
+        currentCompleted.includes(sourceId)
+      );
+      
+      console.log(`Condition check - Completed: ${completedSources.length}/${checkedSources.length} required sources`);
+      console.log(`- Completed sources: [${completedSources.join(', ')}]`);
+      console.log(`- Still waiting for: [${checkedSources.filter(id => !completedSources.includes(id)).join(', ')}]`);
+      
+      if (allRequiredSourcesCompleted) {
+        console.log('All required source paths completed - condition satisfied!');
+        break;
+      }
+      
+      if (!currentState.isRunning) {
+        throw new Error('Execution was stopped while waiting for source nodes');
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+      
+      if (attempts % 10 === 0) {
+        console.log(`Still waiting... (${attempts}s elapsed)`);
+      }
+    }
+    
+    if (attempts >= maxAttempts) {
+      const incompleteSources = checkedSources.filter(sourceId => 
+        !executionState.completedNodes.includes(sourceId)
+      );
+      throw new Error(`Timeout waiting for required source nodes: ${incompleteSources.join(', ')}`);
+    }
+    
+    console.log('Condition node satisfied - proceeding with execution');
     await new Promise(resolve => setTimeout(resolve, 1000));
   };
 
@@ -232,25 +306,93 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     return nextEdges.map(edge => nodes.find(node => node.id === edge.target)).filter(Boolean);
   };
 
-  const traverseFlow = async (startNodeId) => {
+  const generatePathId = () => {
+    return `path_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  const traverseFlow = async (startNodeId, pathId = null) => {
+    if (!pathId) {
+      pathId = generatePathId();
+      updateExecutionState(prev => ({
+        ...prev,
+        activePaths: new Set([...prev.activePaths, pathId])
+      }));
+    }
+
     const startNode = nodes.find(node => node.id === startNodeId);
-    if (!startNode) return;
+    if (!startNode) {
+      console.error(`Node with id ${startNodeId} not found`);
+      return;
+    }
 
     try {
-      await executeNode(startNode);
+      await executeNode(startNode, pathId);
       
       const nextNodes = getNextNodes(startNodeId);
       
       if (nextNodes.length === 0) {
-        console.log('Flow execution completed - no more nodes');
+        console.log(`Path ${pathId} completed - no more nodes from ${startNode.data.label}`);
+        updateExecutionState(prev => ({
+          ...prev,
+          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+        }));
         return;
       }
 
-      const nextPromises = nextNodes.map(nextNode => traverseFlow(nextNode.id));
-      await Promise.all(nextPromises);
+      if (nextNodes.length === 1) {
+        const nextNode = nextNodes[0];
+        
+        if (nextNode.data.deviceType === 'condition') {
+          console.log(`Approaching condition node: ${nextNode.data.label}`);
+          
+          await traverseFlow(nextNode.id, pathId);
+        } else {
+          await traverseFlow(nextNode.id, pathId);
+        }
+      } else {
+        console.log(`Branching into ${nextNodes.length} paths from ${startNode.data.label}`);
+        const conditionNodes = nextNodes.filter(node => node.data.deviceType === 'condition');
+        const regularNodes = nextNodes.filter(node => node.data.deviceType !== 'condition');
+        
+        const branchPromises = [];
+        
+        regularNodes.forEach((nextNode, index) => {
+          const branchPathId = `${pathId}_branch_${index}`;
+          updateExecutionState(prev => ({
+            ...prev,
+            activePaths: new Set([...prev.activePaths, branchPathId])
+          }));
+          branchPromises.push(traverseFlow(nextNode.id, branchPathId));
+        });
+        
+        conditionNodes.forEach((nextNode, index) => {
+          const conditionPathId = `${pathId}_condition_${index}`;
+          updateExecutionState(prev => ({
+            ...prev,
+            activePaths: new Set([...prev.activePaths, conditionPathId])
+          }));
+          branchPromises.push(traverseFlow(nextNode.id, conditionPathId));
+        });
+
+        const results = await Promise.allSettled(branchPromises);
+        
+        const failures = results.filter(result => result.status === 'rejected');
+        if (failures.length > 0) {
+          console.error(`${failures.length} branch(es) failed:`, failures);
+        }
+        
+        updateExecutionState(prev => ({
+          ...prev,
+          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+        }));
+      }
       
     } catch (error) {
-      console.error('Flow traversal error:', error);
+      console.error(`Flow traversal error in path ${pathId}:`, error);
+      updateExecutionState(prev => ({
+        ...prev,
+        activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+      }));
       throw error;
     }
   };
@@ -268,7 +410,8 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
         message: 'Flow execution started',
         timestamp: new Date()
       }],
-      startTime: new Date()
+      startTime: new Date(),
+      activePaths: new Set()
     });
 
     setNodes(nds => nds.map(n => ({
@@ -284,7 +427,9 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 
       await traverseFlow(startNode.id);
       
-      setExecutionState(prev => ({
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateExecutionState(prev => ({
         ...prev,
         isRunning: false,
         executionLog: [...prev.executionLog, {
@@ -301,14 +446,15 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     } catch (error) {
       console.error('Flow execution failed:', error);
       
-      setExecutionState(prev => ({
+      updateExecutionState(prev => ({
         ...prev,
         isRunning: false,
+        activePaths: new Set(), 
         executionLog: [...prev.executionLog, {
           type: 'error',
           message: `Flow execution failed: ${error.message}`,
           timestamp: new Date(),
-          duration: new Date() - prev.startTime
+          duration: prev.startTime ? new Date() - prev.startTime : 0
         }]
       }));
 
@@ -317,9 +463,10 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const handleStopExecution = () => {
-    setExecutionState(prev => ({
+    updateExecutionState(prev => ({
       ...prev,
       isRunning: false,
+      activePaths: new Set(), 
       executionLog: [...prev.executionLog, {
         type: 'warning',
         message: 'Flow execution stopped by user',
@@ -335,33 +482,31 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     console.log('Flow execution stopped by user');
   };
 
-
   const onNodeClick = (e, clickedNode) => {
-  if (clickedNode.data.deviceType === 'delay') {
-    setSelectedNode(clickedNode);
-    setShowDelayConfig(true);
-  } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
-    setSelectedNode(clickedNode);
-  }
-};
+    if (clickedNode.data.deviceType === 'delay') {
+      setSelectedNode(clickedNode);
+      setShowDelayConfig(true);
+    } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
+      setSelectedNode(clickedNode);
+    }
+  };
 
-    const closeDelayConfig = () => {
-      setShowDelayConfig(false);
-      setSelectedNode(null);
-    };
+  const closeDelayConfig = () => {
+    setShowDelayConfig(false);
+    setSelectedNode(null);
+  };
 
-    const updateNodeData = (nodeId, newData) => {
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: newData }
-            : node
-        )
-      );
-      setShowDelayConfig(false);
-      setSelectedNode(null);
-    };
-
+  const updateNodeData = (nodeId, newData) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: newData }
+          : node
+      )
+    );
+    setShowDelayConfig(false);
+    setSelectedNode(null);
+  };
 
   const closeNodeDetails = () => {
     setSelectedNode(null);
@@ -377,7 +522,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
-
 
   const onDrop = useCallback((event) => {
     if (!isEditable) return;
@@ -419,11 +563,8 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     
     setNodes((nds) => nds.concat(newNode));
   }, [rfInstance, isEditable, setNodes]);
-  
 
-
-
-   const validateFlow = () => {
+  const validateFlow = () => {
     const errors = [];
     if (nodes.length === 0) {
       errors.push("Flow must contain at least one node");
@@ -452,7 +593,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
         errors.push(`Input node should have at least one outgoing Edge`);
       }
     });
-    
 
     const connectedNodeIds = new Set();
     edges.forEach(edge => {
@@ -505,7 +645,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const saveFlowToBackend = async () => {
-
     const validation = validateFlow();
     
     if (!validation.isValid) {
@@ -590,7 +729,6 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     }
 }, [scenarioToLoad, currentScenarioName, isCreatingNew, loadFlowFromBackend, setNodes, setIsEditable, setCurrentScenarioName]);
  
-
   const handleSaveAs = async () => {
     const newScenarioName = prompt("Enter a new name for this scenario:");
     
@@ -706,6 +844,8 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
             </div>
           </div>
         )}
+
+      
       </Panel>
 
       <ReactFlowProvider>

@@ -9,7 +9,6 @@ import uuid
 import time
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -268,7 +267,6 @@ def upload_image():
     
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        # Add timestamp and field name to make filename unique
         field_name = request.form.get('fieldName', '')
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_filename = f"{field_name}_{timestamp}_{filename}"
@@ -321,15 +319,45 @@ def execute_device():
         logger.info(f"Executing device {device_id} for node {node_id} in scenario {scenario_name}")
         logger.info(f"Device config: {config}")
         
-        
+        if device_id:
+            redis_client.set(f'{device_id}:current_config', json.dumps(config))
+            logger.info(f"Stored config for device {device_id}")
+            
+            activate_response = activate(device_id)
+            activate_data = activate_response.get_json()
+            
+            if activate_data.get('status') == 'success':
+                return jsonify({
+                    'status': 'success',
+                    'message': f'Device {device_id} activated successfully',
+                    'deviceId': device_id,
+                    'nodeId': node_id,
+                    'config': config
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Failed to activate device {device_id}',
+                    'deviceId': device_id,
+                    'nodeId': node_id
+                }), 500
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Device ID is required',
+                'deviceId': device_id,
+                'nodeId': node_id
+            }), 400
+            
     except Exception as e:
         logger.error(f"Error executing device: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': f'Device execution failed: {str(e)}',
-            'deviceId': data.get('deviceId') if data else None,
-            'nodeId': data.get('nodeId') if data else None
+            'deviceId': data.get('deviceId') if 'data' in locals() else None,
+            'nodeId': data.get('nodeId') if 'data' in locals() else None
         }), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
