@@ -53,14 +53,16 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const [isCreatingNew, setIsCreatingNew] = useState(!scenarioToLoad);
 
   const [executionState, setExecutionState] = useState({
-    isRunning: false,
-    currentNodes: [],
-    completedNodes: [],
-    failedNodes: [],
-    executionLog: [],
-    startTime: null,
-    activePaths: new Set() 
-  });
+  isRunning: false,
+  currentNodes: [],
+  completedNodes: [],
+  failedNodes: [],
+  executionLog: [],
+  startTime: null,
+  activePaths: new Set(),
+  shouldStop: false, 
+  globalError: null   
+});
 
   const updateExecutionState = useCallback((updater) => {
     setExecutionState(prev => updater(prev));
