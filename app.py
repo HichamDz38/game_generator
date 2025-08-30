@@ -313,6 +313,7 @@ def execute_device():
         
         device_id = data.get('deviceId')
         config = data.get('config', {})
+        print(config)
         node_id = data.get('nodeId')
         scenario_name = data.get('scenarioName')
         
@@ -356,6 +357,23 @@ def execute_device():
             'message': f'Device execution failed: {str(e)}',
             'deviceId': data.get('deviceId') if 'data' in locals() else None,
             'nodeId': data.get('nodeId') if 'data' in locals() else None
+        }), 500
+
+@app.route('/get_status/<device_id>', methods=['GET'])
+def get_status(device_id):
+    try:
+        status = redis_client.get(f'{device_id}:status') or 'unknown'
+        
+        return jsonify({
+            'status': 'success',
+            'device_id': device_id,
+            'status': status
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to get device status: {str(e)}'
         }), 500
 
 
