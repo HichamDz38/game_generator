@@ -167,6 +167,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   const { config, originalDeviceId } = node.data;
   
   try {
+    // Start the device
     const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -184,12 +185,18 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     const result = await response.json();
     console.log('Device start result:', result);
     
+    // Poll for device status
     let status = 'in progress';
     let attempts = 0;
     const maxAttempts = 300;
     const pollInterval = 1000;
     
     while (status === 'in progress' && attempts < maxAttempts) {
+      // Check if execution was stopped by user
+      if (!executionState.isRunning) {
+        throw new Error('Execution was stopped by user');
+      }
+      
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
       try {
@@ -198,44 +205,20 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
           const statusData = await statusResponse.json();
           status = statusData.status;
           
-          setNodes(nds => nds.map(n => {
-            if (n.id === node.id) {
-              let backgroundColor, borderColor;
-              
-              switch (status) {
-                case 'in progress':
-                  backgroundColor = '#ffeb3b';
-                  borderColor = '#ff9800';
-                  break;
-                case 'completed':
-                  backgroundColor = '#4caf50';
-                  borderColor = '#2e7d32';
-                  break;
-                case 'failed':
-                  backgroundColor = '#f44336';
-                  borderColor = '#d32f2f';
-                  break;
-                default:
-                  backgroundColor = '#ffeb3b';
-                  borderColor = '#ff9800';
-              }
-              
-              return {
-                ...n,
-                style: { ...n.style, backgroundColor, border: `2px solid ${borderColor}` }
-              };
-            }
-            return n;
-          }));
+          console.log(`Device ${originalDeviceId} status: ${status}`);
           
           if (status === 'completed') {
             console.log(`Device ${originalDeviceId} completed successfully`);
             return result;
           } else if (status === 'failed') {
-            throw new Error(`Device ${originalDeviceId} failed`);
+            // IMMEDIATE STOP - throw error that will stop entire flow
+            throw new Error(`Device failed`);
           }
         }
       } catch (error) {
+        if (error.message === 'Device failed') {
+          throw error; // Re-throw device failure immediately
+        }
         console.warn(`Status check failed for device ${originalDeviceId}:`, error);
       }
       
@@ -254,18 +237,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     
   } catch (error) {
     console.error('Device execution error:', error);
-    
-    setNodes(nds => nds.map(n => {
-      if (n.id === node.id) {
-        return {
-          ...n,
-          style: { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
-        };
-      }
-      return n;
-    }));
-    
-    throw error;
+    throw error; 
   }
 };
 
@@ -493,69 +465,80 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
 };
 
   const handleStartExecution = async () => {
-    console.log('Starting flow execution...');
-    
-    setExecutionState({
-      isRunning: true,
-      currentNodes: [],
-      completedNodes: [],
-      failedNodes: [],
-      executionLog: [{
-        type: 'info',
-        message: 'Flow execution started',
-        timestamp: new Date()
-      }],
-      startTime: new Date(),
-      activePaths: new Set()
-    });
+  console.log('Starting flow execution...');
+  
+  setExecutionState({
+    isRunning: true,
+    currentNodes: [],
+    completedNodes: [],
+    failedNodes: [],
+    executionLog: [{
+      type: 'info',
+      message: 'Flow execution started',
+      timestamp: new Date()
+    }],
+    startTime: new Date(),
+    activePaths: new Set()
+  });
 
+  // Reset all node styles
+  setNodes(nds => nds.map(n => ({
+    ...n,
+    style: { ...n.style, backgroundColor: undefined, border: undefined }
+  })));
+
+  try {
+    const startNode = nodes.find(node => node.type === 'input');
+    if (!startNode) {
+      throw new Error('No start node found');
+    }
+
+    await traverseFlow(startNode.id);
+    
+    // If we get here, everything completed successfully
+    updateExecutionState(prev => ({
+      ...prev,
+      isRunning: false,
+      executionLog: [...prev.executionLog, {
+        type: 'success',
+        message: 'Flow execution completed successfully',
+        timestamp: new Date(),
+        duration: new Date() - prev.startTime
+      }]
+    }));
+
+    console.log('Flow execution completed successfully');
+    alert('Flow execution completed successfully!');
+
+  } catch (error) {
+    console.error('Flow execution failed:', error);
+    
+    // Stop execution immediately
+    updateExecutionState(prev => ({
+      ...prev,
+      isRunning: false,
+      executionLog: [...prev.executionLog, {
+        type: 'error',
+        message: `Flow execution failed: ${error.message}`,
+        timestamp: new Date(),
+        duration: prev.startTime ? new Date() - prev.startTime : 0
+      }]
+    }));
+
+    // Reset node styles
     setNodes(nds => nds.map(n => ({
       ...n,
       style: { ...n.style, backgroundColor: undefined, border: undefined }
     })));
 
-    try {
-      const startNode = nodes.find(node => node.type === 'input');
-      if (!startNode) {
-        throw new Error('No start node found');
-      }
-
-      await traverseFlow(startNode.id);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      updateExecutionState(prev => ({
-        ...prev,
-        isRunning: false,
-        executionLog: [...prev.executionLog, {
-          type: 'success',
-          message: 'Flow execution completed successfully',
-          timestamp: new Date(),
-          duration: new Date() - prev.startTime
-        }]
-      }));
-
-      console.log('Flow execution completed successfully');
-      alert('Flow execution completed successfully!');
-
-    } catch (error) {
-      console.error('Flow execution failed:', error);
-      
-      updateExecutionState(prev => ({
-        ...prev,
-        isRunning: false,
-        activePaths: new Set(), 
-        executionLog: [...prev.executionLog, {
-          type: 'error',
-          message: `Flow execution failed: ${error.message}`,
-          timestamp: new Date(),
-          duration: prev.startTime ? new Date() - prev.startTime : 0
-        }]
-      }));
-
+    // Show specific alert for device failure
+    if (error.message.includes('Device failed')) {
+      alert('Device failed - Flow execution stopped');
+    } else {
       alert(`Flow execution failed: ${error.message}`);
     }
-  };
+  }
+};
 
   const handleStopExecution = () => {
     updateExecutionState(prev => ({
