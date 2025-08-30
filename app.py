@@ -149,10 +149,38 @@ def reset(device_id):
     redis_client.lpush(f'{device_id}:commands', "reset")
     return jsonify({'status': 'success'})
 
-@app.route('/activate/<device_id>', methods=['POST'])
-def activate(device_id):
-    redis_client.lpush(f'{device_id}:commands', "activate")
-    return jsonify({'status': 'success'})
+@app.route('/start/<device_id>', methods=['POST'])
+def start(device_id):
+    try:
+        config_json = redis_client.get(f'{device_id}:current_config')
+        config_data = json.loads(config_json) if config_json else {}
+        
+        simple_config = {}
+        for key, config_item in config_data.items():
+            if 'value' in config_item:
+                simple_config[key] = config_item['value']
+            else:
+                simple_config[key] = config_item
+        
+        redis_client.set(f'{device_id}:status', 'in progress')
+        
+        command_data = {
+            'command': 'start',
+            'config': simple_config
+        }
+        redis_client.lpush(f'{device_id}:commands', json.dumps(command_data))
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Device {device_id} started with config',
+            'config': simple_config
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to start device: {str(e)}'
+        }), 500
 
 @app.route('/finish/<device_id>', methods=['POST'])
 def finish(device_id):
@@ -313,32 +341,38 @@ def execute_device():
         
         device_id = data.get('deviceId')
         config = data.get('config', {})
-        print(config)
         node_id = data.get('nodeId')
         scenario_name = data.get('scenarioName')
         
+        simple_config = {}
+        for key, config_item in config.items():
+            if 'value' in config_item:
+                simple_config[key] = config_item['value']
+            else:
+                simple_config[key] = config_item
+        
         logger.info(f"Executing device {device_id} for node {node_id} in scenario {scenario_name}")
-        logger.info(f"Device config: {config}")
+        logger.info(f"Device config values: {simple_config}")
         
         if device_id:
             redis_client.set(f'{device_id}:current_config', json.dumps(config))
             logger.info(f"Stored config for device {device_id}")
             
-            activate_response = activate(device_id)
-            activate_data = activate_response.get_json()
+            start_response = start(device_id)
+            start_data = start_response.get_json()
             
-            if activate_data.get('status') == 'success':
+            if start_data.get('status') == 'success':
                 return jsonify({
                     'status': 'success',
-                    'message': f'Device {device_id} activated successfully',
+                    'message': f'Device {device_id} started successfully',
                     'deviceId': device_id,
                     'nodeId': node_id,
-                    'config': config
+                    'config': simple_config  
                 }), 200
             else:
                 return jsonify({
                     'status': 'error',
-                    'message': f'Failed to activate device {device_id}',
+                    'message': f'Failed to start device {device_id}',
                     'deviceId': device_id,
                     'nodeId': node_id
                 }), 500

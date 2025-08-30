@@ -210,6 +210,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     console.error('Device execution error:', error);
     throw error;
   }
+};
 
   const executeVirtualNode = async (node) => {
     const speed = node.data.config?.speed?.value || 3000;
