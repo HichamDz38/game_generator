@@ -380,8 +380,6 @@ def send_status(device_id):
             }), 400
         
         redis_client.set(f'{device_id}:status', status)
-        print(status)
-        redis_client.set(f'{device_id}:status', 'completed')
         
         logger.info(f"Device {device_id} status updated to: {status}")
         
@@ -389,7 +387,7 @@ def send_status(device_id):
             'status': 'success',
             'message': f'Device {device_id} status updated to {status}',
             'device_id': device_id,
-            'status': status
+            'device_status': status  
         }), 200
         
     except Exception as e:
