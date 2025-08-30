@@ -156,16 +156,24 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const executeDeviceNode = async (node) => {
-  const { config, originalDeviceId } = node.data;
+  
+  console.log("this is node data: ",node.data);
+  const { config, originalDeviceId } = node.data; 
+  console.log("config : ",config);
+  console.log("device id : ",originalDeviceId);
+  
+  if (!originalDeviceId) {
+    throw new Error("Device ID not found in node data");
+  }
   
   try {
     const response = await fetch(`${API_BASE_URL}/execute_device`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deviceId: originalDeviceId,
+        deviceId: originalDeviceId, 
         config: config,
-        nodeId: node.id,
+        nodeId: node.id, 
         scenarioName: currentScenarioName
       })
     });
@@ -548,45 +556,51 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   }, []);
 
   const onDrop = useCallback((event) => {
-    if (!isEditable) return;
-    
-    event.preventDefault();
-    const type = event.dataTransfer.getData('application/reactflow');
-    const label = event.dataTransfer.getData('application/label');
-    const config = JSON.parse(event.dataTransfer.getData('application/config'));
-    const deviceDataStr = event.dataTransfer.getData('application/deviceData');
-    const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
-    const deviceId = event.dataTransfer.getData('application/deviceId'); 
+  if (!isEditable) return;
+  
+  event.preventDefault();
+  const type = event.dataTransfer.getData('application/reactflow');
+  const label = event.dataTransfer.getData('application/label');
+  const config = JSON.parse(event.dataTransfer.getData('application/config'));
+  const deviceDataStr = event.dataTransfer.getData('application/deviceData');
+  const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
+  const uniqueId = event.dataTransfer.getData('application/uniqueId');
+  const deviceId = event.dataTransfer.getData('application/deviceId');
 
-    if (typeof type === 'undefined' || !type) return;
+  if (typeof type === 'undefined' || !type) return;
 
-    const position = rfInstance.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-    
-    const newNodeId = deviceId || getId();
-    
-    if (!deviceId) {
-      idnumber = idnumber + 1;
-    }
+  const position = rfInstance.screenToFlowPosition({
+    x: event.clientX,
+    y: event.clientY,
+  });
+  
+  const newNodeId = uniqueId || getId();
+  
+  if (!uniqueId) {
+    idnumber = idnumber + 1;
+  }
 
-    const newNode = {
-      id: newNodeId,
-      type: type === 'device' ? 'default' : type, 
-      position,
-      data: { 
-        label: label || `${type} node`,
-        deviceType: type === 'device' ? 
-          (deviceData?.node_type || 'device') : 
-          type,
-        config: config,
-        originalDeviceId: deviceData ? Object.keys(deviceData)[0] : null 
-      },
-    };
-    
-    setNodes((nds) => nds.concat(newNode));
-  }, [rfInstance, isEditable, setNodes]);
+  const newNode = {
+    id: newNodeId,
+    type: type === 'device' ? 'default' : type, 
+    position,
+    data: { 
+      label: label || `${type} node`,
+      deviceType: type === 'device' ? 
+        (deviceData?.node_type || 'device') : 
+        type,
+      config: config,
+      uniqueId: uniqueId,
+      originalDeviceId: deviceId, // This should be the actual device ID like '127.0.0.1:34914'
+      deviceData: deviceData
+    },
+  };
+
+  console.log("Created new node:", newNode);
+  console.log("Node data.originalDeviceId:", newNode.data.originalDeviceId);
+  
+  setNodes((nds) => nds.concat(newNode));
+}, [rfInstance, isEditable, setNodes]);
 
   const validateFlow = () => {
     const errors = [];
