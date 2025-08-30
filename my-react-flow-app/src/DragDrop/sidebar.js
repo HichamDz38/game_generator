@@ -117,6 +117,5 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
   );
 }
 
-//"proxy": "http://localhost:5000",
 
 export default Sidebar;

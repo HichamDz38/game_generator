@@ -155,67 +155,111 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
     }
   };
 
-  const executeDeviceNode = async (node) => {
-  
-  console.log("this is node data: ",node.data);
-  const { config, originalDeviceId } = node.data; 
-  console.log("config : ",config);
-  console.log("device id : ",originalDeviceId);
-  
-  if (!originalDeviceId) {
-    throw new Error("Device ID not found in node data");
-  }
+  const executeDeviceNode = async (node, pathId = null) => {
+  const { config, originalDeviceId } = node.data;
   
   try {
-    const response = await fetch(`${API_BASE_URL}/execute_device`, {
+    // Call the combined start route (which now includes execute_device functionality)
+    const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deviceId: originalDeviceId, 
         config: config,
-        nodeId: node.id, 
+        nodeId: node.id,
         scenarioName: currentScenarioName
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Device execution failed: ${response.statusText}`);
+      throw new Error(`Device start failed: ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log('Device execution result:', result);
+    console.log('Device start result:', result);
     
+    // Poll for device status until completed or failed
     let status = 'in progress';
     let attempts = 0;
-    const maxAttempts = 60; 
+    const maxAttempts = 300;
+    const pollInterval = 1000;
     
     while (status === 'in progress' && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
       
-      const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        status = statusData.status;
-        
-        if (status === 'completed') {
-          console.log(`Device ${originalDeviceId} completed successfully`);
-          break;
-        } else if (status === 'failed') {
-          throw new Error(`Device ${originalDeviceId} failed`);
+      try {
+        const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          status = statusData.status;
+          
+          // Update node visual feedback
+          setNodes(nds => nds.map(n => {
+            if (n.id === node.id) {
+              let backgroundColor, borderColor;
+              
+              switch (status) {
+                case 'in progress':
+                  backgroundColor = '#ffeb3b';
+                  borderColor = '#ff9800';
+                  break;
+                case 'completed':
+                  backgroundColor = '#4caf50';
+                  borderColor = '#2e7d32';
+                  break;
+                case 'failed':
+                  backgroundColor = '#f44336';
+                  borderColor = '#d32f2f';
+                  break;
+                default:
+                  backgroundColor = '#ffeb3b';
+                  borderColor = '#ff9800';
+              }
+              
+              return {
+                ...n,
+                style: { ...n.style, backgroundColor, border: `2px solid ${borderColor}` }
+              };
+            }
+            return n;
+          }));
+          
+          if (status === 'completed') {
+            console.log(`Device ${originalDeviceId} completed successfully`);
+            return result;
+          } else if (status === 'failed') {
+            throw new Error(`Device ${originalDeviceId} failed`);
+          }
         }
+      } catch (error) {
+        console.warn(`Status check failed for device ${originalDeviceId}:`, error);
       }
       
       attempts++;
+      
+      if (attempts % 10 === 0) {
+        console.log(`Waiting for device ${originalDeviceId}... (${attempts}s elapsed)`);
+      }
     }
     
     if (status === 'in progress') {
-      throw new Error(`Device ${originalDeviceId} timeout`);
+      throw new Error(`Device ${originalDeviceId} timeout after ${maxAttempts} seconds`);
     }
     
     return result;
     
   } catch (error) {
     console.error('Device execution error:', error);
+    
+    setNodes(nds => nds.map(n => {
+      if (n.id === node.id) {
+        return {
+          ...n,
+          style: { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
+        };
+      }
+      return n;
+    }));
+    
     throw error;
   }
 };
@@ -591,7 +635,7 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
         type,
       config: config,
       uniqueId: uniqueId,
-      originalDeviceId: deviceId, // This should be the actual device ID like '127.0.0.1:34914'
+      originalDeviceId: deviceId,
       deviceData: deviceData
     },
   };
