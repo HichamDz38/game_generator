@@ -111,18 +111,18 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
       }
 
       updateExecutionState(prev => ({
-        ...prev,
-        completedNodes: [...prev.completedNodes, node.id],
-        currentNodes: prev.currentNodes.filter(id => id !== node.id),
-        executionLog: [...prev.executionLog, {
-          type: 'success',
-          nodeId: node.id,
-          nodeName: node.data.label,
-          timestamp: new Date(),
-          message: `Successfully executed ${node.data.label}`,
-          pathId: pathId
-        }]
-      }));
+      ...prev,
+      completedNodes: [...prev.completedNodes, node.id],
+      currentNodes: prev.currentNodes.filter(id => id !== node.id),
+      executionLog: [...prev.executionLog, {
+        type: 'success',
+        nodeId: node.id,
+        nodeName: node.data.label,
+        timestamp: new Date(),
+        message: `Successfully executed ${node.data.label}`,
+        pathId: pathId
+      }]
+    }));
 
       setNodes(nds => nds.map(n => ({
         ...n,
@@ -137,29 +137,31 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
       console.error(`Error executing node ${node.id}:`, error);
       
       updateExecutionState(prev => ({
-        ...prev,
-        failedNodes: [...prev.failedNodes, node.id],
-        currentNodes: prev.currentNodes.filter(id => id !== node.id),
-        executionLog: [...prev.executionLog, {
-          type: 'error',
-          nodeId: node.id,
-          nodeName: node.data.label,
-          timestamp: new Date(),
-          message: `Failed to execute ${node.data.label}: ${error.message}`,
-          pathId: pathId
-        }]
-      }));
+      ...prev,
+      shouldStop: true,
+      globalError: `Node "${node.data.label}" failed: ${error.message}`,
+      failedNodes: [...prev.failedNodes, node.id],
+      currentNodes: prev.currentNodes.filter(id => id !== node.id),
+      executionLog: [...prev.executionLog, {
+        type: 'error',
+        nodeId: node.id,
+        nodeName: node.data.label,
+        timestamp: new Date(),
+        message: `Failed to execute ${node.data.label}: ${error.message}`,
+        pathId: pathId
+      }]
+    }));
 
       setNodes(nds => nds.map(n => ({
-        ...n,
-        style: n.id === node.id 
-          ? { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
-          : n.style
-      })));
+      ...n,
+      style: n.id === node.id 
+        ? { ...n.style, backgroundColor: '#f44336', border: '2px solid #d32f2f' }
+        : n.style
+    })));
 
-      throw error;
-    }
-  };
+    throw error; 
+  }
+};
 
   const executeDeviceNode = async (node, pathId = null) => {
   const { config, originalDeviceId } = node.data;
@@ -390,91 +392,105 @@ const DnDFlow = ({nodeData, scenarioToLoad, onScenarioSaved }) => {
   };
 
   const traverseFlow = async (startNodeId, pathId = null) => {
-    if (!pathId) {
-      pathId = generatePathId();
-      updateExecutionState(prev => ({
-        ...prev,
-        activePaths: new Set([...prev.activePaths, pathId])
-      }));
+  if (!pathId) {
+    pathId = generatePathId();
+    updateExecutionState(prev => ({
+      ...prev,
+      activePaths: new Set([...prev.activePaths, pathId])
+    }));
+  }
+
+  // Check global stop flag
+  if (executionState.shouldStop) {
+    console.log(`Path ${pathId} stopped due to global stop flag`);
+    updateExecutionState(prev => ({
+      ...prev,
+      activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+    }));
+    throw new Error(`Flow execution stopped: ${executionState.globalError}`);
+  }
+
+  const startNode = nodes.find(node => node.id === startNodeId);
+  if (!startNode) {
+    console.error(`Node with id ${startNodeId} not found`);
+    return;
+  }
+
+  try {
+    await executeNode(startNode, pathId);
+    
+    // Check again after node execution
+    if (executionState.shouldStop) {
+      throw new Error(`Flow execution stopped: ${executionState.globalError}`);
     }
-
-    const startNode = nodes.find(node => node.id === startNodeId);
-    if (!startNode) {
-      console.error(`Node with id ${startNodeId} not found`);
-      return;
-    }
-
-    try {
-      await executeNode(startNode, pathId);
-      
-      const nextNodes = getNextNodes(startNodeId);
-      
-      if (nextNodes.length === 0) {
-        console.log(`Path ${pathId} completed - no more nodes from ${startNode.data.label}`);
-        updateExecutionState(prev => ({
-          ...prev,
-          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
-        }));
-        return;
-      }
-
-      if (nextNodes.length === 1) {
-        const nextNode = nextNodes[0];
-        
-        if (nextNode.data.deviceType === 'condition') {
-          console.log(`Approaching condition node: ${nextNode.data.label}`);
-          
-          await traverseFlow(nextNode.id, pathId);
-        } else {
-          await traverseFlow(nextNode.id, pathId);
-        }
-      } else {
-        console.log(`Branching into ${nextNodes.length} paths from ${startNode.data.label}`);
-        const conditionNodes = nextNodes.filter(node => node.data.deviceType === 'condition');
-        const regularNodes = nextNodes.filter(node => node.data.deviceType !== 'condition');
-        
-        const branchPromises = [];
-        
-        regularNodes.forEach((nextNode, index) => {
-          const branchPathId = `${pathId}_branch_${index}`;
-          updateExecutionState(prev => ({
-            ...prev,
-            activePaths: new Set([...prev.activePaths, branchPathId])
-          }));
-          branchPromises.push(traverseFlow(nextNode.id, branchPathId));
-        });
-        
-        conditionNodes.forEach((nextNode, index) => {
-          const conditionPathId = `${pathId}_condition_${index}`;
-          updateExecutionState(prev => ({
-            ...prev,
-            activePaths: new Set([...prev.activePaths, conditionPathId])
-          }));
-          branchPromises.push(traverseFlow(nextNode.id, conditionPathId));
-        });
-
-        const results = await Promise.allSettled(branchPromises);
-        
-        const failures = results.filter(result => result.status === 'rejected');
-        if (failures.length > 0) {
-          console.error(`${failures.length} branch(es) failed:`, failures);
-        }
-        
-        updateExecutionState(prev => ({
-          ...prev,
-          activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
-        }));
-      }
-      
-    } catch (error) {
-      console.error(`Flow traversal error in path ${pathId}:`, error);
+    
+    const nextNodes = getNextNodes(startNodeId);
+    
+    if (nextNodes.length === 0) {
+      console.log(`Path ${pathId} completed - no more nodes from ${startNode.data.label}`);
       updateExecutionState(prev => ({
         ...prev,
         activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
       }));
-      throw error;
+      return;
     }
-  };
+
+    if (nextNodes.length === 1) {
+      const nextNode = nextNodes[0];
+      await traverseFlow(nextNode.id, pathId);
+    } else {
+      console.log(`Branching into ${nextNodes.length} paths from ${startNode.data.label}`);
+      
+      const branchPromises = [];
+      
+      nextNodes.forEach((nextNode, index) => {
+        const branchPathId = `${pathId}_branch_${index}`;
+        updateExecutionState(prev => ({
+          ...prev,
+          activePaths: new Set([...prev.activePaths, branchPathId])
+        }));
+        branchPromises.push(traverseFlow(nextNode.id, branchPathId));
+      });
+
+      // Use Promise.race with a stop condition instead of allSettled
+      const stopPromise = new Promise((_, reject) => {
+        const checkStop = () => {
+          if (executionState.shouldStop) {
+            reject(new Error(`Flow execution stopped: ${executionState.globalError}`));
+          } else {
+            setTimeout(checkStop, 100); // Check every 100ms
+          }
+        };
+        checkStop();
+      });
+
+      try {
+        // Race between all branches completing and the stop signal
+        await Promise.race([
+          Promise.all(branchPromises), // All branches must succeed
+          stopPromise // Or stop signal wins
+        ]);
+      } catch (error) {
+        // If any branch fails or stop signal is triggered, cancel all
+        console.error('Branch execution failed, stopping all paths');
+        throw error;
+      }
+      
+      updateExecutionState(prev => ({
+        ...prev,
+        activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+      }));
+    }
+    
+  } catch (error) {
+    console.error(`Flow traversal error in path ${pathId}:`, error);
+    updateExecutionState(prev => ({
+      ...prev,
+      activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+    }));
+    throw error;
+  }
+};
 
   const handleStartExecution = async () => {
     console.log('Starting flow execution...');
