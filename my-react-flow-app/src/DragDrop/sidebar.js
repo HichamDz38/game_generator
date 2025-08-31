@@ -82,7 +82,7 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick}) {
           className="dndnode device"
           onDragStart={(event) => onDragStart(
             event,
-            'Timer',
+            'default',
             `Timer-${idCounter.current++}`,
             {
               "seconds":{
