@@ -37,3 +37,15 @@ services:
       - gamepanel
     env_file:
       - .env
+
+  tcp_server:
+    build:
+      context: ./tcp_server
+      dockerfile: Dockerfile
+    ports:
+      - "65432:65432"
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    restart: unless-stopped

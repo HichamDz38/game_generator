@@ -205,12 +205,12 @@ const isRunningRef = useRef(false);
       const result = await response.json();
       console.log('Device start result:', result);
       
-      let status = 'in progress';
+      let status = 'started';
       let attempts = 0;
       const maxAttempts = 300;
       const pollInterval = 1000;
       
-      while (status === 'in progress' && attempts < maxAttempts) {
+      while (status === 'started' && attempts < maxAttempts) {
         if (!isRunningRef.current) {
           console.log('Execution was stopped - breaking polling loop');
           throw new Error('Execution was stopped by user');
@@ -219,19 +219,19 @@ const isRunningRef = useRef(false);
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         
         try {
-          const statusResponse = await fetch(`${API_BASE_URL}/get_status/${originalDeviceId}`);
+          const statusResponse = await fetch(`${API_BASE_URL}/get_status/${node.id}`);
           if (statusResponse.ok) {
             const statusData = await statusResponse.json();
             status = statusData.status;
             
-            console.log(`Device ${originalDeviceId} status: ${status} (attempt ${attempts})`);
+            console.log(`Device ${node.id} status: ${status} (attempt ${attempts})`);
             
             setNodes(nds => nds.map(n => {
               if (n.id === node.id) {
                 let backgroundColor, borderColor;
                 
                 switch (status) {
-                  case 'in progress':
+                  case 'started':
                     backgroundColor = '#ffeb3b';
                     borderColor = '#ff9800';
                     break;

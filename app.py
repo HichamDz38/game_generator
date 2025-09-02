@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 
-redis_client = redis.Redis(host='host.docker.internal', port=6379, decode_responses=True)
+redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
 
 
 
@@ -397,15 +397,14 @@ def send_status(device_id):
             'message': f'Failed to update device status: {str(e)}'
         }), 500
 
-@app.route('/get_status/<device_id>', methods=['GET'])
-def get_status(device_id):
+@app.route('/get_status/<node_id>', methods=['GET'])
+def get_status(node_id):
     try:
-        status = redis_client.get(f'{device_id}:status') or 'unknown'
+        status = redis_client.get(f"flow_execution:{node_id}")
         print(status)
-        
+
         return jsonify({
-            'status': 'success',
-            'device_id': device_id,
+            'node_id': node_id,
             'status': status
         })
         
