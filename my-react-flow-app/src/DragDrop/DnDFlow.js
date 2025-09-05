@@ -619,16 +619,18 @@ const stopAllActiveExecutions = useCallback(() => {
 
   try {
     console.log(`Starting execution of node ${startNode.data.label} in path ${pathId}`);
+
+    
     await executeNode(startNode, pathId);
     
-    if (executionState.shouldCompleteEarly) {
-      console.log(`Early completion detected - stopping path ${pathId}`);
-      updateExecutionState(prev => ({
-        ...prev,
-        activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
-      }));
-      return 'EARLY_COMPLETE';
-    }
+    // if (executionState.shouldCompleteEarly) {
+    //   console.log(`Early completion detected - stopping path ${pathId}`);
+    //   updateExecutionState(prev => ({
+    //     ...prev,
+    //     activePaths: new Set([...prev.activePaths].filter(p => p !== pathId))
+    //   }));
+    //   return 'EARLY_COMPLETE';
+    // }
     
     const nextNodes = getNextNodes(startNodeId);
     
@@ -709,8 +711,10 @@ const stopAllActiveExecutions = useCallback(() => {
 
   const handleStartExecution = async () => {
   setisStart(true);
-  console.log('Starting flow execution...');
   isRunningRef.current = true;
+  
+  completionStateRef.current = { completedNodes: [], failedNodes: [] };
+  
   setExecutionState({
     isRunning: true,
     currentNodes: [],
@@ -724,7 +728,9 @@ const stopAllActiveExecutions = useCallback(() => {
     startTime: new Date(),
     activePaths: new Set(),
     shouldStop: false,
-    globalError: null
+    globalError: null,
+    shouldCompleteEarly: false,
+    earlyCompletionReason: null
   });
 
   setNodes(nds => nds.map(n => ({
@@ -732,84 +738,84 @@ const stopAllActiveExecutions = useCallback(() => {
     style: { ...n.style, backgroundColor: undefined, border: undefined }
   })));
 
+  await new Promise(resolve => setTimeout(resolve, 50));
+
   try {
     const startNode = nodes.find(node => node.type === 'input');
     if (!startNode) {
       throw new Error('No start node found');
     }
 
+    console.log('Starting traversal from node:', startNode.id);
     await traverseFlow(startNode.id);
     
-    const hasConditionNodes = nodes.some(node => node.data.deviceType === 'condition');
+    console.log('Flow execution completed normally');
+    updateExecutionState(prev => ({
+      ...prev,
+      isRunning: false,
+      executionLog: [...prev.executionLog, {
+        type: 'success',
+        message: 'Flow execution completed successfully',
+        timestamp: new Date(),
+        duration: new Date() - prev.startTime
+      }]
+    }));
     
-    if (isRunningRef.current && !executionState.shouldStop && !hasConditionNodes) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      updateExecutionState(prev => ({
-        ...prev,
-        isRunning: false,
-        executionLog: [...prev.executionLog, {
-          type: 'success',
-          message: 'Flow execution completed successfully',
-          timestamp: new Date(),
-          duration: new Date() - prev.startTime
-        }]
-      }));
-
-      console.log('Flow execution completed successfully (normal flow)');
-      alert('Flow execution completed successfully!');
-    }
+    alert('Flow execution completed successfully!');
 
   } catch (error) {
     console.error('Flow execution failed:', error);
     
-    updateExecutionState(prev => ({
-      ...prev,
-      isRunning: false,
-      activePaths: new Set(),
-      shouldStop: false,
-      executionLog: [...prev.executionLog, {
-        type: 'error',
-        message: `Flow execution failed: ${error.message}`,
-        timestamp: new Date(),
-        duration: prev.startTime ? new Date() - prev.startTime : 0
-      }]
-    }));
-
-    setNodes(nds => nds.map(n => ({
-      ...n,
-      style: { ...n.style, backgroundColor: undefined, border: undefined }
-    })));
-
-    if (error.message === 'Device failed') {
-      alert('Device failed - Flow execution stopped');
-    } else if (error.message.includes('stopped by user')) {
-      console.log('Flow stopped by user - no alert needed');
+    if (error.message.includes('stopped by user')) {
+      console.log('Flow stopped by user');
     } else {
       alert(`Flow execution failed: ${error.message}`);
     }
-  }
-};
-
-  const handleStopExecution = () => {
+  } finally {
     setisStart(false);
     isRunningRef.current = false;
+    
     updateExecutionState(prev => ({
       ...prev,
       isRunning: false,
-      shouldStop: false, 
-      activePaths: new Set(),
-      executionLog: [...prev.executionLog, {
-        type: 'warning',
-        message: 'Flow execution stopped by user',
-        timestamp: new Date()
-      }]
+      shouldStop: true
     }));
+  }
+};
 
+  const resetFlowState = useCallback(() => {
+  setisStart(false);
+  isRunningRef.current = false;
+  
+  setExecutionState(prev => ({
+    ...prev,
+    isRunning: false,
+    currentNodes: [],
+    completedNodes: [],
+    failedNodes: [],
+    shouldStop: true,
+    activePaths: new Set()
+  }));
+  
   setNodes(nds => nds.map(n => ({
     ...n,
     style: { ...n.style, backgroundColor: undefined, border: undefined }
   })));
+}, [setNodes]);
+
+
+
+  const handleStopExecution = () => {
+  resetFlowState();
+  
+  updateExecutionState(prev => ({
+    ...prev,
+    executionLog: [...prev.executionLog, {
+      type: 'warning',
+      message: 'Flow execution stopped by user',
+      timestamp: new Date()
+    }]
+  }));
 
   console.log('Flow execution stopped by user');
 };
@@ -1084,12 +1090,14 @@ useEffect(() => {
     failedNodes: executionState.failedNodes
   };
   
-  if (executionState.isRunning && !executionState.shouldCompleteEarly) {
+  if (executionState.isRunning && 
+      !executionState.shouldCompleteEarly && 
+      !executionState.shouldStop) {
     
     const shouldComplete = checkForFlowCompletion();
     
     if (shouldComplete) {
-      console.log('FLOW COMPLETED - Stopping execution');
+      console.log('AUTOMATIC FLOW COMPLETION DETECTED - Stopping execution');
       
       const hasConditionNodes = nodes.some(node => node.data.deviceType === 'condition');
       
@@ -1101,7 +1109,7 @@ useEffect(() => {
         ...prev,
         isRunning: false,
         shouldStop: true,
-        shouldCompleteEarly: hasConditionNodes,
+        shouldCompleteEarly: false, 
         currentNodes: hasConditionNodes ? [] : prev.currentNodes,
         activePaths: hasConditionNodes ? new Set() : prev.activePaths,
         earlyCompletionReason: hasConditionNodes ? 'Condition-based completion' : 'Full flow completion',
@@ -1113,6 +1121,9 @@ useEffect(() => {
         }]
       }));
       
+      setisStart(false);
+      isRunningRef.current = false;
+      
       setTimeout(() => {
         alert(`Flow execution completed successfully! ${hasConditionNodes ? 'Condition requirements satisfied.' : 'All devices completed.'}`);
       }, 300);
@@ -1123,6 +1134,7 @@ useEffect(() => {
   executionState.failedNodes, 
   executionState.isRunning, 
   executionState.shouldCompleteEarly,
+  executionState.shouldStop,
   checkForFlowCompletion, 
   updateExecutionState,
   stopAllActiveExecutions,
