@@ -5,7 +5,7 @@ from display import main as display_img
 import time
 
 class GeniricDevice():
-    HOST = "192.168.16.240"  # The server's hostname or IP address
+    HOST = "localhost"  # The server's hostname or IP address
     PORT = 65432
     BACKEND_PORT = 5000
 
