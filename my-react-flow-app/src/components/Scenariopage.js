@@ -56,18 +56,21 @@ function Scenariopage({ onScenarioSelect, onCreateNew, scenarioName}) {
   };
   
   const onScenarioDeleted = () => {
-  fetchScenarios();
-};
+    fetchScenarios();
+  };
 
   const handleDelete = async (scenarioName, e) => {
-  e.stopPropagation(); 
-  try {
-    const response = await axios.delete(`http://localhost:5000/delete_scenario/${scenarioName}`);
-    if (response.status === 200) {
-      onScenarioDeleted(); 
+  e.stopPropagation();
+  const confirmed = window.confirm("Are you sure you want to delete this scenario?");
+  if (confirmed) {
+    try {
+      const response = await axios.delete(`http://localhost:5000/delete_scenario/${scenarioName}`);
+      if (response.status === 200) {
+        onScenarioDeleted(); 
+      }
+    } catch (error) {
+      console.error('Error deleting ', error);
     }
-  } catch (error) {
-    console.error('Error deleting ', error);
   }
 };
 
