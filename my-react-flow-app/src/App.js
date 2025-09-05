@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import DnDFlow from './DragDrop/DnDFlow';
 import Navbar from './components/Navbar';
 import Scenariopage from './components/Scenariopage';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 
-function FlowEditorWrapper() {
+function FlowEditorWrapper({ onFlowRunningChange }) {
   const { scenarioName } = useParams();
   const navigate = useNavigate();
 
@@ -23,6 +23,7 @@ function FlowEditorWrapper() {
         scenarioToLoad={scenarioName || null} 
         onScenarioSaved={handleScenarioSaved}
         onBackToList={handleBackToList}
+        onFlowRunningChange={onFlowRunningChange}
       />
     </ReactFlowProvider>
   );
@@ -30,10 +31,20 @@ function FlowEditorWrapper() {
 
 export default function App() {
   const navigate = useNavigate();
+  const [isFlowRunning, setIsFlowRunning] = useState(false);
+
+  const handleReturnScenarioSelect = () => {
+    if (!isFlowRunning) {
+      navigate('/scenarios');
+    }
+  };
 
   return (
     <div className="app">
-      <Navbar onReturnScenarioSelect={() => navigate('/scenarios')} />
+      <Navbar 
+        onReturnScenarioSelect={handleReturnScenarioSelect}
+        isFlowRunning={isFlowRunning}
+      />
       <div style={{ display: 'flex' }}>
         <Routes>
           <Route 
@@ -45,7 +56,10 @@ export default function App() {
               />
             } 
           />
-          <Route path="/flow/:scenarioName?" element={<FlowEditorWrapper />} />
+          <Route 
+            path="/flow/:scenarioName?" 
+            element={<FlowEditorWrapper onFlowRunningChange={setIsFlowRunning} />} 
+          />
           <Route path="*" element={<Navigate to="/scenarios" replace />} />
         </Routes>
       </div>

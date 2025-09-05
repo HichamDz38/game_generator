@@ -57,7 +57,7 @@ const getId = (existingNodes = []) => {
   return newId;
 };
 
-const DnDFlow = ({scenarioToLoad, onScenarioSaved }) => {
+const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -67,7 +67,7 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved }) => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [IsCreatingNew, setIsCreatingNew] = useState(!scenarioToLoad);
   const [hasInitialized, setHasInitialized] = useState(false);
-
+  const [isStart, setisStart] = useState(false);
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
 
   const [executionState, setExecutionState] = useState({
@@ -89,6 +89,12 @@ const isRunningRef = useRef(false);
   useEffect(() => {
     isRunningRef.current = executionState.isRunning;
   }, [executionState.isRunning]);
+
+  useEffect(() => {
+    if (onFlowRunningChange) {
+      onFlowRunningChange(isStart);
+    }
+  }, [isStart, onFlowRunningChange]);
 
   const updateExecutionState = useCallback((updater) => {
     setExecutionState(prev => updater(prev));
@@ -702,8 +708,9 @@ const stopAllActiveExecutions = useCallback(() => {
 };
 
   const handleStartExecution = async () => {
+  setisStart(true);
   console.log('Starting flow execution...');
-  
+  isRunningRef.current = true;
   setExecutionState({
     isRunning: true,
     currentNodes: [],
@@ -785,17 +792,19 @@ const stopAllActiveExecutions = useCallback(() => {
 };
 
   const handleStopExecution = () => {
-  updateExecutionState(prev => ({
-    ...prev,
-    isRunning: false,
-    shouldStop: false, 
-    activePaths: new Set(),
-    executionLog: [...prev.executionLog, {
-      type: 'warning',
-      message: 'Flow execution stopped by user',
-      timestamp: new Date()
-    }]
-  }));
+    setisStart(false);
+    isRunningRef.current = false;
+    updateExecutionState(prev => ({
+      ...prev,
+      isRunning: false,
+      shouldStop: false, 
+      activePaths: new Set(),
+      executionLog: [...prev.executionLog, {
+        type: 'warning',
+        message: 'Flow execution stopped by user',
+        timestamp: new Date()
+      }]
+    }));
 
   setNodes(nds => nds.map(n => ({
     ...n,
@@ -1236,7 +1245,7 @@ useEffect(() => {
               SAVE 
             </button>
           )}
-          
+
           {!isEditable && !executionState.isRunning && (
           <button className={styles.theme__button} onClick={handledeleteScenario}>
             DELETE
