@@ -21,7 +21,18 @@
   text-transform: lowercase;
   border-color: #eee6ff;
   border-radius: 8px;
-  margin-top: 27%;
+  margin-top: 20%;
+}
+
+.theme__button_new {
+  background: #eee6ff;
+  color: black;
+  font-size: 20px;
+  text-transform: lowercase;
+  border-color: #eee6ff;
+  border-radius: 8px;
+  margin-top: 57%;
+  margin-right: 70px;
 }
 
 

@@ -1252,9 +1252,14 @@ useEffect(() => {
           </button>
           )}
 
-          {isEditable && (
+          {isEditable && !IsCreatingNew &&(
             <button className={styles.theme__button} onClick={handleSave}>
               SAVE 
+            </button>
+          )}
+          {isEditable && IsCreatingNew &&(
+            <button className={styles.theme__button_new} onClick={handleSave}>
+              SAVE
             </button>
           )}
 
