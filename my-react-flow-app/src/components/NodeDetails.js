@@ -9,12 +9,18 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   const [uploading, setUploading] = useState({});
   const [uploadStatus, setUploadStatus] = useState({});
   const [connectedSources, setConnectedSources] = useState([]);
+  const [configValues, setConfigValues] = useState({});
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {
       const previews = {};
+      const values = {};
+      
       Object.keys(nodeData.data.config).forEach(key => {
         const config = nodeData.data.config[key];
+        
+        values[key] = config.value !== undefined ? config.value : '';
+        
         if (config.type === 'file' && config.value) {
           if (config.value.startsWith('data:image/')) {
             previews[key] = config.value;
@@ -26,7 +32,9 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
           }
         }
       });
+      
       setImagePreviews(previews);
+      setConfigValues(values);
     }
 
     if (nodeData && nodeData.data?.deviceType === 'condition') {
@@ -54,10 +62,25 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
               sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
             };
           }
+          setConfigValues(prev => ({
+            ...prev,
+            [checkboxKey]: nodeData.data.config[checkboxKey]?.value || false
+          }));
         });
       }
     }
   }, [nodeData, nodes, edges]);
+
+  const handleInputChange = (fieldName, value) => {
+    setConfigValues(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+    
+    if (nodeData.data.config[fieldName]) {
+      nodeData.data.config[fieldName].value = value;
+    }
+  };
 
   if (!nodeData) return null;
 
@@ -190,18 +213,9 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                     <input
                       type="checkbox"
                       name={checkboxKey}
-                      defaultChecked={config.value === true || config.value === 'true'}
+                      checked={configValues[checkboxKey] === true || configValues[checkboxKey] === 'true'}
                       onChange={(e) => {
-                        if (!nodeData.data.config[checkboxKey]) {
-                          nodeData.data.config[checkboxKey] = {
-                            type: 'checkbox',
-                            value: e.target.checked,
-                            sourceNodeId: sourceNode.id,
-                            sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
-                          };
-                        } else {
-                          nodeData.data.config[checkboxKey].value = e.target.checked;
-                        }
+                        handleInputChange(checkboxKey, e.target.checked);
                       }}
                     />
                     {`${sourceNode.data.label}`}
@@ -225,7 +239,12 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                   <div className={styles.inputtitlecountainer}>
                     <strong className={styles.titleinputNodeDetails}>{item}: </strong>  
                     {value.type === "select" ? (
-                      <select name={item} defaultValue={value.value} className={styles.optionNodeDetails}>
+                      <select 
+                        name={item} 
+                        value={configValues[item] || ''} 
+                        onChange={(e) => handleInputChange(item, e.target.value)}
+                        className={styles.optionNodeDetails}
+                      >
                         <option value=""></option>
                         {value.options.map((option, i) => (
                           <option key={i} value={option}>{option}</option>
@@ -266,8 +285,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                           <input 
                             type={value.type}
                             name={item} 
-                            defaultChecked={value.value === true || value.value === 'true'}
-                            value={value.value || true}
+                            checked={configValues[item] === true || configValues[item] === 'true'}
+                            onChange={(e) => handleInputChange(item, e.target.checked)}
                           />
                         </label>
                       </div>
@@ -276,7 +295,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                         className={styles.inputNodeDetails} 
                         name={item} 
                         type={value.type} 
-                        defaultValue={value.value}
+                        value={configValues[item] || ''}
+                        onChange={(e) => handleInputChange(item, e.target.value)}
                         {...(nodeData.data.deviceType === 'delay' && item === 'delaySeconds' ? {
                           type: 'number',
                           min: '1',
@@ -312,4 +332,3 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
 }
 
 export default NodeDetails;
-
