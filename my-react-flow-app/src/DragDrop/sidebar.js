@@ -118,7 +118,7 @@ const generateUniqueId = () => {
               'delay',  
               `Timer-${uniqueId}`,
               {
-                "delaySeconds": {
+                "delay": {
                   'type': 'number',
                   'value': 3  
                 }
