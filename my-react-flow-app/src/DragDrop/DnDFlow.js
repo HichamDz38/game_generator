@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import styles from './MyComponent.module.css';
 import { deleteScenario } from '../components/deleteScenario';
 import NodeDetails from '../components/NodeDetails';
@@ -85,6 +85,7 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
 });
 
 const isRunningRef = useRef(false);
+
 
   useEffect(() => {
     isRunningRef.current = executionState.isRunning;
@@ -404,7 +405,7 @@ const isRunningRef = useRef(false);
   return nextEdges.map(edge => nodes.find(node => node.id === edge.target)).filter(Boolean);
 }, [edges, nodes]);
 
-  const checkForFlowCompletion = useCallback(() => {
+const checkForFlowCompletion = useCallback(() => {
   const conditionNodes = nodes.filter(node => node.data.deviceType === 'condition');
   
   if (conditionNodes.length === 0) {
@@ -435,60 +436,18 @@ const isRunningRef = useRef(false);
     return allNodesCompleted;
   }
   
-  console.log('Condition nodes found - checking only condition logic (ignoring parallel nodes)');
+  console.log('Condition nodes found - checking condition logic');
   
-  for (const conditionNode of conditionNodes) {
-    const { config } = conditionNode.data;
-    
-    if (!config) {
-      console.log(`Condition node ${conditionNode.data.label} has no config`);
-      continue;
-    }
-    
-    
-    const checkedSources = Object.keys(config)
-      .filter(key => key.startsWith('source_') && config[key].value === true)
-      .map(key => config[key].sourceNodeId);
-    
-    console.log(`Condition node ${conditionNode.data.label}:`, {
-      checkedSources: checkedSources.length,
-      checkedSourceIds: checkedSources
-    });
-    
-    if (checkedSources.length === 0) {
-      console.log(`Condition node ${conditionNode.data.label} has no checked sources - passes automatically`);
-      continue;
-    }
-    
-    const anyCheckedFailed = checkedSources.some(sourceId => 
-      executionState.failedNodes.includes(sourceId)
+  const allConditionNodesCompleted = conditionNodes.every(conditionNode => 
+    executionState.completedNodes.includes(conditionNode.id)
+  );
+  
+  if (!allConditionNodesCompleted) {
+    const incompleteConditions = conditionNodes.filter(cond => 
+      !executionState.completedNodes.includes(cond.id)
     );
-    
-    if (anyCheckedFailed) {
-      console.log(`Condition node ${conditionNode.data.label} - required sources failed`);
-      return false;
-    }
-    
-    const allCheckedCompleted = checkedSources.every(sourceId => 
-      executionState.completedNodes.includes(sourceId)
-    );
-    
-    if (!allCheckedCompleted) {
-      const completedSources = checkedSources.filter(sourceId => 
-        executionState.completedNodes.includes(sourceId)
-      );
-      console.log(`Condition node ${conditionNode.data.label} - waiting for CHECKED sources: ${completedSources.length}/${checkedSources.length} completed`);
-      return false;
-    }
-    
-    console.log(`Condition node ${conditionNode.data.label} - all CHECKED sources completed`);
-    
-    if (!executionState.completedNodes.includes(conditionNode.id)) {
-      console.log(`Condition node ${conditionNode.data.label} ready to execute`);
-      return false;
-    }
-    
-    console.log(`Condition node ${conditionNode.data.label} completed`);
+    console.log('Waiting for condition nodes to complete:', incompleteConditions.map(c => c.data.label));
+    return false;
   }
   
   const outputNodes = nodes.filter(node => node.type === 'output');
@@ -497,14 +456,13 @@ const isRunningRef = useRef(false);
   );
   
   if (allOutputsCompleted) {
-    console.log('All condition requirements satisfied and output nodes completed - flow can finish');
+    console.log('All condition nodes and output nodes completed - flow can finish');
     return true;
   }
   
-  console.log('Condition requirements satisfied but output nodes not completed yet');
+  console.log('Condition nodes completed but output nodes not completed yet');
   return false;
 }, [nodes, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes]);
-
 
 const stopAllActiveExecutions = useCallback(() => {
   console.log('Stopping all active executions for early completion');
@@ -526,42 +484,40 @@ const stopAllActiveExecutions = useCallback(() => {
 }, [executionState.currentNodes, setNodes]);
 
 
-  const executeConditionNode = async (node) => {
+const executeConditionNode = async (node, pathId = null) => {
   const { config } = node.data;
   
-  if (!config) {
-    console.log(`Condition node ${node.data.label} has no config - passing through`);
+  if (!config || !config.sources) {
+    console.log(`Condition node ${node.data.label} has no sources configured - passing through`);
     await new Promise(resolve => setTimeout(resolve, 100));
     return;
   }
   
-  const sourceConfigs = Object.keys(config)
-    .filter(key => key.startsWith('source_'))
-    .map(key => ({
-      key,
-      sourceNodeId: config[key].sourceNodeId,
-      isChecked: config[key].value === true
-    }));
+  const requiredSources = Object.entries(config.sources)
+    .filter(([key, sourceConfig]) => sourceConfig.checked === true)
+    .map(([key, sourceConfig]) => sourceConfig.sourceNodeId);
   
-  const checkedSources = sourceConfigs
-    .filter(source => source.isChecked)
-    .map(source => source.sourceNodeId);
+  console.log(`Condition node ${node.data.label} analysis:`, {
+    allSources: Object.entries(config.sources).map(([key, source]) => ({
+      id: source.sourceNodeId, 
+      checked: source.checked,
+      label: source.label
+    })),
+    requiredSources,
+    requiredCount: requiredSources.length
+  });
   
-  console.log(`Condition node ${node.data.label} analysis:`);
-  console.log('- All sources:', sourceConfigs.map(s => ({id: s.sourceNodeId, checked: s.isChecked})));
-  console.log('- Checked sources (must complete):', checkedSources);
-  
-  if (checkedSources.length === 0) {
-    console.log('No sources checked - condition node passes immediately');
+  if (requiredSources.length === 0) {
+    console.log('No sources required - condition node passes immediately');
     await new Promise(resolve => setTimeout(resolve, 100));
     return;
   }
   
-  console.log(`Waiting for ${checkedSources.length} checked source(s) to complete...`);
+  console.log(`Waiting for ${requiredSources.length} required source(s) to complete...`);
   
   let attempts = 0;
   const maxAttempts = 6000; 
-  const checkInterval = 100; 
+  const checkInterval = 100;
   
   while (attempts < maxAttempts) {
     if (!isRunningRef.current) {
@@ -571,22 +527,26 @@ const stopAllActiveExecutions = useCallback(() => {
     const currentCompleted = completionStateRef.current.completedNodes;
     const currentFailed = completionStateRef.current.failedNodes;
     
-    const failedSources = checkedSources.filter(sourceId => 
+    const failedSources = requiredSources.filter(sourceId => 
       currentFailed.includes(sourceId)
     );
     
     if (failedSources.length > 0) {
-      throw new Error(`Required source node(s) failed: ${failedSources.join(', ')}`);
+      const failedLabels = failedSources.map(id => {
+        const failedNode = nodes.find(n => n.id === id);
+        return failedNode ? failedNode.data.label : id;
+      });
+      throw new Error(`Required source node(s) failed: ${failedLabels.join(', ')}`);
     }
     
-    const completedSources = checkedSources.filter(sourceId => 
+    const completedSources = requiredSources.filter(sourceId => 
       currentCompleted.includes(sourceId)
     );
     
-    const allCheckedSourcesCompleted = completedSources.length === checkedSources.length;
+    const allRequiredSourcesCompleted = completedSources.length === requiredSources.length;
     
-    if (allCheckedSourcesCompleted) {
-      console.log(`All ${checkedSources.length} checked source nodes completed - condition satisfied!`);
+    if (allRequiredSourcesCompleted) {
+      console.log(`All ${requiredSources.length} required source nodes completed - condition satisfied!`);
       break;
     }
     
@@ -594,17 +554,27 @@ const stopAllActiveExecutions = useCallback(() => {
     attempts++;
     
     if (attempts % 50 === 0 && attempts > 0) {
-      console.log(`Condition ${node.data.label} waiting: ${completedSources.length}/${checkedSources.length} sources completed`);
-      console.log('Completed sources:', completedSources);
-      console.log('Still waiting for:', checkedSources.filter(id => !currentCompleted.includes(id)));
+      const waitingFor = requiredSources.filter(id => !currentCompleted.includes(id));
+      const waitingLabels = waitingFor.map(id => {
+        const waitingNode = nodes.find(n => n.id === id);
+        return waitingNode ? waitingNode.data.label : id;
+      });
+      
+      console.log(`Condition ${node.data.label} waiting: ${completedSources.length}/${requiredSources.length} sources completed`);
+      console.log('Still waiting for:', waitingLabels);
     }
   }
   
   if (attempts >= maxAttempts) {
-    const incompleteSources = checkedSources.filter(sourceId => 
+    const incompleteSources = requiredSources.filter(sourceId => 
       !completionStateRef.current.completedNodes.includes(sourceId)
     );
-    throw new Error(`Timeout waiting for checked source nodes: ${incompleteSources.join(', ')}`);
+    const incompleteLabels = incompleteSources.map(id => {
+      const incompleteNode = nodes.find(n => n.id === id);
+      return incompleteNode ? incompleteNode.data.label : id;
+    });
+    
+    throw new Error(`Timeout waiting for required source nodes: ${incompleteLabels.join(', ')}`);
   }
   
   console.log(`Condition node ${node.data.label} satisfied - proceeding to next nodes`);
@@ -728,6 +698,11 @@ const stopAllActiveExecutions = useCallback(() => {
   
   completionStateRef.current = { completedNodes: [], failedNodes: [] };
   
+  setNodes(nds => nds.map(n => ({
+    ...n,
+    style: { ...n.style, backgroundColor: undefined, border: undefined }
+  })));
+  
   setExecutionState({
     isRunning: true,
     currentNodes: [],
@@ -746,11 +721,6 @@ const stopAllActiveExecutions = useCallback(() => {
     earlyCompletionReason: null
   });
 
-  setNodes(nds => nds.map(n => ({
-    ...n,
-    style: { ...n.style, backgroundColor: undefined, border: undefined }
-  })));
-
   await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
@@ -763,6 +733,12 @@ const stopAllActiveExecutions = useCallback(() => {
     await traverseFlow(startNode.id);
     
     console.log('Flow execution completed normally');
+    
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      style: { ...n.style, backgroundColor: undefined, border: undefined }
+    })));
+    
     updateExecutionState(prev => ({
       ...prev,
       isRunning: false,
@@ -778,6 +754,11 @@ const stopAllActiveExecutions = useCallback(() => {
 
   } catch (error) {
     console.error('Flow execution failed:', error);
+    
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      style: { ...n.style, backgroundColor: undefined, border: undefined }
+    })));
     
     if (error.message.includes('stopped by user')) {
       console.log('Flow stopped by user');
@@ -800,6 +781,11 @@ const stopAllActiveExecutions = useCallback(() => {
   setisStart(false);
   isRunningRef.current = false;
   
+  setNodes(nds => nds.map(n => ({
+    ...n,
+    style: { ...n.style, backgroundColor: undefined, border: undefined }
+  })));
+  
   setExecutionState(prev => ({
     ...prev,
     isRunning: false,
@@ -809,16 +795,16 @@ const stopAllActiveExecutions = useCallback(() => {
     shouldStop: true,
     activePaths: new Set()
   }));
-  
-  setNodes(nds => nds.map(n => ({
-    ...n,
-    style: { ...n.style, backgroundColor: undefined, border: undefined }
-  })));
 }, [setNodes]);
 
 
 
   const handleStopExecution = () => {
+  setNodes(nds => nds.map(n => ({
+    ...n,
+    style: { ...n.style, backgroundColor: undefined, border: undefined }
+  })));
+  
   resetFlowState();
   
   updateExecutionState(prev => ({
@@ -1118,6 +1104,11 @@ useEffect(() => {
         stopAllActiveExecutions();
       }
       
+      setNodes(nds => nds.map(n => ({
+        ...n,
+        style: { ...n.style, backgroundColor: undefined, border: undefined }
+      })));
+      
       updateExecutionState(prev => ({
         ...prev,
         isRunning: false,
@@ -1151,7 +1142,8 @@ useEffect(() => {
   checkForFlowCompletion, 
   updateExecutionState,
   stopAllActiveExecutions,
-  nodes
+  nodes,
+  setNodes
 ]);
 
   const handleSaveAs = async () => {

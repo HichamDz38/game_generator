@@ -147,7 +147,7 @@ const generateUniqueId = () => {
             );
           }}
           draggable
-        >
+        > 
           Condition
         </div>
       </div>
