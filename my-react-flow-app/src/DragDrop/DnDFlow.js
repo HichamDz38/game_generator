@@ -103,13 +103,17 @@ const isRunningRef = useRef(false);
   const transformConfigForDevice = (config) => {
     const transformedConfig = {};
     
-    for (const [key, configObj] of Object.entries(config)) {
-      if (configObj && typeof configObj === 'object' && 'value' in configObj) {
-        transformedConfig[key] = configObj.value;
+     for (const [key, configObj] of Object.entries(config)) {
+      if (configObj && typeof configObj === 'object') {
+        if ('value' in configObj) {
+          transformedConfig[key] = configObj.value;
+        } else {
+          transformedConfig[key] = "null";
+        }
       } else {
         transformedConfig[key] = configObj;
       }
-    }
+  }
     
     console.log('Original config:', config);
     console.log('Transformed config:', transformedConfig);
@@ -235,6 +239,15 @@ const isRunningRef = useRef(false);
     
     try {
       const transformedConfig = transformConfigForDevice(config);
+
+      const cleanedConfig = {};
+      for (const [key, value] of Object.entries(transformedConfig)) {
+        if (value === undefined) {
+          cleanedConfig[key] = "null"; 
+        } else {
+          cleanedConfig[key] = value; 
+        }
+      }
       
       const response = await fetch(`${API_BASE_URL}/start/${originalDeviceId}`, {
         method: 'POST',

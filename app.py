@@ -164,13 +164,24 @@ def start(device_id):
         
         logger.info(f"Starting device {device_id} for node {node_id} in scenario {scenario_name}")
         logger.info(f"Device config: {config}")
+
+        processed_config = {}
+        for key, value in config.items():
+            if value == "null":
+                processed_config[key] = None
+            else:
+                processed_config[key] = value
         
         redis_client.set(f'{device_id}:current_config', json.dumps(config))
         logger.info(f"Stored config for device {device_id}")
+
         
         simple_config = {}
         for key, value in config.items():
-            simple_config[key] = value
+            if value == "null":
+                simple_config[key] = None  
+            else:
+                simple_config[key] = value
         
         redis_client.set(f'{device_id}:status', 'in progress')
         
