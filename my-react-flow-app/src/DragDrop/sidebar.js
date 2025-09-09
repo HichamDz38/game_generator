@@ -24,22 +24,22 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
   }, [existingNodes]);
 
   const isIdUnique = (id) => {
-  return !existingNodes.some(node => 
-    node.id === id.toString() || 
-    node.id === `N${id}` || 
-    node.data?.uniqueId === id
-  );
-};
+    return !existingNodes.some(node => 
+      node.id === id.toString() || 
+      node.id === `N${id}` || 
+      node.data?.uniqueId === id
+    );
+  };
 
-const generateUniqueId = () => {
-  let newId;
-  do {
-    idCounter.current++;
-    newId = idCounter.current;
-  } while (!isIdUnique(newId));
-  
-  return newId;
-};
+  const generateUniqueId = () => {
+    let newId;
+    do {
+      idCounter.current++;
+      newId = idCounter.current;
+    } while (!isIdUnique(newId));
+    
+    return newId;
+  };
 
   const onDragStart = (event, nodeType, label, config, deviceData, uniqueId, deviceId) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
@@ -61,7 +61,29 @@ const generateUniqueId = () => {
         const devicesData = await response.text();
         try {
           const parsedDevices = JSON.parse(devicesData.replace(/'/g, '"'));
-          setDevices(parsedDevices);
+          
+          const processedDevices = {};
+          Object.keys(parsedDevices).forEach(deviceId => {
+            const device = parsedDevices[deviceId];
+            if (device.config) {
+              const processedConfig = {};
+              Object.keys(device.config).forEach(fieldName => {
+                const fieldConfig = device.config[fieldName];
+                processedConfig[fieldName] = {
+                  ...fieldConfig,
+                  required: fieldConfig.required !== undefined ? fieldConfig.required : false
+                };
+              });
+              processedDevices[deviceId] = {
+                ...device,
+                config: processedConfig
+              };
+            } else {
+              processedDevices[deviceId] = device;
+            }
+          });
+          
+          setDevices(processedDevices);
         } catch (parseError) {
           console.error('Error parsing devices data:', parseError);
         }
@@ -118,9 +140,10 @@ const generateUniqueId = () => {
               'delay',  
               `Timer-${uniqueId}`,
               {
-                "delay": {
+                "delaySeconds": {
                   'type': 'number',
-                  'value': 3  
+                  'value': 3,
+                  'required': true  
                 }
               },
               { deviceType: 'delay' }, 
@@ -140,7 +163,13 @@ const generateUniqueId = () => {
               event,
               'condition',
               `Condition-${uniqueId}`,
-              {},
+              {
+                "sources": {
+                  'type': 'object',
+                  'value': {},
+                  'required': false
+                }
+              },
               null, 
               uniqueId,
               null

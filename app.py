@@ -253,11 +253,13 @@ def save_random_device_config():
             'status': 'active',
             'config':{
                 "speed":{
-                    'type' : 'number'
+                    'type' : 'number',
+                    'required': True
                 },
                 "direction":{
                     'type' : 'select',
-                    'options': ["LEFT", "RIGHT"]
+                    'options': ["LEFT", "RIGHT"],
+                    'required': True
                 }
             }
         },
@@ -267,10 +269,12 @@ def save_random_device_config():
             'status': 'active',
             'config':{
                 "num_players":{
-                    'type' : 'number'
+                    'type' : 'number',
+                    'required': True
                 },
                 "message":{
                     'type' : 'text',
+                    'required': True
                 }
             }
         },
@@ -280,11 +284,13 @@ def save_random_device_config():
             'status': 'active',
             'config':{
                 "Agree!":{
-                    'type' : 'checkbox'
+                    'type' : 'checkbox',
+                    'required': True
                 },
                 "image1":{
                     'type' : 'file',
                     'accept' : 'image/*',
+                    'required': True
                 }
             }
         },
@@ -296,18 +302,22 @@ def save_random_device_config():
                 "image1":{
                     'type' : 'file',
                     'accept' : 'image/*',
+                    'required': True
                 },
                 "image2":{
                     'type' : 'file',
                     'accept' : 'image/*',
+                    'required': True
                 },
                 "image3":{
                     'type' : 'file',
                     'accept' : 'image/*',
+                    'required': True
                 },
                 "Do you agree !":{
                     'type' : 'checkbox',
-                    'value' : 'yes'
+                    'value' : 'yes',
+                    'required': True
                 }
             }
         },

@@ -10,6 +10,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   const [uploadStatus, setUploadStatus] = useState({});
   const [connectedSources, setConnectedSources] = useState([]);
   const [configValues, setConfigValues] = useState({});
+  const [validationErrors, setValidationErrors] = useState({});
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {
@@ -35,6 +36,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
       
       setImagePreviews(previews);
       setConfigValues(values);
+      setValidationErrors({});
     }
 
     if (nodeData && nodeData.data?.deviceType === 'condition') {
@@ -50,10 +52,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
       setConnectedSources(sourceNodes);
 
       if (nodeData.data.config) {
-        console.log("____________________________");
         sourceNodes.forEach(sourceNode => {
           const checkboxKey = `source_${sourceNode.id}`;
-          console.log(sourceNode.data.label);
           if (!nodeData.data.config[checkboxKey]) {
             nodeData.data.config[checkboxKey] = {
               type: 'checkbox',
@@ -80,7 +80,61 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
     if (nodeData.data.config[fieldName]) {
       nodeData.data.config[fieldName].value = value;
     }
+
+    if (validationErrors[fieldName]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
   };
+
+  const validateRequiredFields = () => {
+  const errors = {};
+  let isValid = true;
+
+  if (nodeData && nodeData.data && nodeData.data.config) {
+    Object.keys(nodeData.data.config).forEach(fieldName => {
+      const config = nodeData.data.config[fieldName];
+      
+      if (fieldName.startsWith('source_')) {
+        return;
+      }
+
+      if (config.required) {
+        const value = configValues[fieldName];
+        let isEmpty = false;
+
+        switch (config.type) {
+          case 'text':
+          case 'number':
+          case 'select':
+            isEmpty = value === '' || value === null || value === undefined;
+            break;
+          case 'checkbox':
+            isEmpty = value === false || value === 'false';
+            break;
+          case 'file':
+            const hasValidFile = config.value && config.value.startsWith('/static/uploads/');
+            const isUploading = config.tempDataUrl;
+            isEmpty = !hasValidFile && !isUploading;
+            break;
+          default:
+            isEmpty = !value;
+        }
+
+        if (isEmpty) {
+          errors[fieldName] = `${fieldName} is required`;
+          isValid = false;
+        }
+      }
+    });
+  }
+
+  setValidationErrors(errors);
+  return isValid;
+};
 
   if (!nodeData) return null;
 
@@ -122,6 +176,13 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
         setImagePreviews(prev => ({ ...prev, [fieldName]: fullImageUrl }));
         
         setUploadStatus(prev => ({ ...prev, [fieldName]: 'success' }));
+        
+        setValidationErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[fieldName];
+          return newErrors;
+        });
+        
         setTimeout(() => {
           setUploadStatus(prev => {
             const newStatus = { ...prev };
@@ -141,37 +202,43 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
-    if (!containerRef.current) return;
-    
-    const formElements = containerRef.current.querySelectorAll('input, select, textarea');
-    formElements.forEach(element => {
-      if (element.type !== 'file') {
-        if (element.type === 'checkbox') {
-          nodeData.data.config[element.name].value = element.checked;
-        } else {
-          nodeData.data.config[element.name].value = element.value;
-        }
+  e.preventDefault();
+  if (!containerRef.current) return;
+  
+  if (!validateRequiredFields()) {
+    alert('Please fill in all required fields (marked with *)');
+    return;
+  }
+
+  const hasUploadingRequiredFiles = Object.keys(nodeData.data.config).some(key => {
+    const config = nodeData.data.config[key];
+    return config.required && 
+           config.type === 'file' && 
+           config.tempDataUrl && 
+           !config.value.startsWith('/static/uploads/');
+  });
+
+  if (hasUploadingRequiredFiles) {
+    alert('Please wait for file uploads to complete before saving');
+    return;
+  }
+
+  const formElements = containerRef.current.querySelectorAll('input, select, textarea');
+  formElements.forEach(element => {
+    if (element.type !== 'file') {
+      if (element.type === 'checkbox') {
+        nodeData.data.config[element.name].value = element.checked;
+      } else {
+        nodeData.data.config[element.name].value = element.value;
       }
-    });
-
-    const hasUnuploadedImages = Object.keys(nodeData.data.config).some(key => {
-      const config = nodeData.data.config[key];
-      return config.type === 'file' && 
-             config.tempDataUrl && 
-             !config.value.startsWith('/static/uploads');
-    });
-
-    if (hasUnuploadedImages) {
-      alert('Please complete all image uploads before saving');
-      return;
     }
+  });
 
-    if (onUpdate) {
-      onUpdate(nodeData.id, nodeData.data);
-    }
-    onClose();
-  };
+  if (onUpdate) {
+    onUpdate(nodeData.id, nodeData.data);
+  }
+  onClose();
+};
 
   const getUploadStatusMessage = (fieldName) => {
     const status = uploadStatus[fieldName];
@@ -233,17 +300,24 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
               return null;
             }
 
+            const isRequired = value.required || false;
+            const hasError = validationErrors[item];
+
             return (
-              <div key={item}>
+              <div key={item} className={`${styles.configField} ${hasError ? styles.fieldError : ''}`}>
                 <label>
                   <div className={styles.inputtitlecountainer}>
-                    <strong className={styles.titleinputNodeDetails}>{item}: </strong>  
+                    <strong className={styles.titleinputNodeDetails}>
+                      {item}: 
+                      {isRequired && <span className={styles.requiredStar}>*</span>}
+                    </strong>  
                     {value.type === "select" ? (
                       <select 
                         name={item} 
                         value={configValues[item] || ''} 
                         onChange={(e) => handleInputChange(item, e.target.value)}
-                        className={styles.optionNodeDetails}
+                        className={`${styles.optionNodeDetails} ${hasError ? styles.inputError : ''}`}
+                        required={isRequired}
                       >
                         <option value=""></option>
                         {value.options.map((option, i) => (
@@ -252,8 +326,9 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                       </select>
                     ) : value.type === "file" ? (
                       <div className={styles.fileInputContainer}>
-                        <label className={styles.fileInputLabel}>
+                        <label className={`${styles.fileInputLabel} ${hasError ? styles.inputError : ''} ${isRequired ? styles.requiredField : ''}`}>
                           Choose {item}
+                          {isRequired && <span className={styles.requiredStar}>*</span>}
                           <input 
                             type="file" 
                             name={item} 
@@ -261,6 +336,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                             onChange={(e) => handleFileChange(e, item)}
                             className={styles.hiddenFileInput}
                             disabled={uploading[item]}
+                            required={isRequired}
                           />
                         </label>
                         {getUploadStatusMessage(item)}
@@ -278,6 +354,13 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                             />
                           </div>
                         )}
+                        {hasError && <span className={styles.errorMessage}>{validationErrors[item]}</span>}
+
+                        {value.value && value.value.startsWith('/static/uploads/') && (
+                          <div className={styles.currentFileInfo}>
+                            <p>Current file: {value.value.split('/').pop()}</p>
+                          </div>
+                        )}
                       </div>
                     ) : value.type === "checkbox" ? (
                       <div>
@@ -287,22 +370,28 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                             name={item} 
                             checked={configValues[item] === true || configValues[item] === 'true'}
                             onChange={(e) => handleInputChange(item, e.target.checked)}
+                            required={isRequired}
                           />
                         </label>
+                        {hasError && <span className={styles.errorMessage}>{validationErrors[item]}</span>}
                       </div>
                     ) : (
-                      <input 
-                        className={styles.inputNodeDetails} 
-                        name={item} 
-                        type={value.type} 
-                        value={configValues[item] || ''}
-                        onChange={(e) => handleInputChange(item, e.target.value)}
-                        {...(nodeData.data.deviceType === 'delay' && item === 'delaySeconds' ? {
-                          type: 'number',
-                          min: '1',
-                          step: '1'
-                        } : {})}
-                      />
+                      <div>
+                        <input 
+                          className={`${styles.inputNodeDetails} ${hasError ? styles.inputError : ''}`}
+                          name={item} 
+                          type={value.type} 
+                          value={configValues[item] || ''}
+                          onChange={(e) => handleInputChange(item, e.target.value)}
+                          required={isRequired}
+                          {...(nodeData.data.deviceType === 'delay' && item === 'delaySeconds' ? {
+                            type: 'number',
+                            min: '1',
+                            step: '1'
+                          } : {})}
+                        />
+                        {hasError && <span className={styles.errorMessage}>{validationErrors[item]}</span>}
+                      </div>
                     )}
                   </div>
                 </label>

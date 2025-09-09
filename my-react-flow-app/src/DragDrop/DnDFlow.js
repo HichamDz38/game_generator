@@ -69,6 +69,7 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [isStart, setisStart] = useState(false);
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
+  const [isPaused, setIsPaused] = useState(false);
 
   const [executionState, setExecutionState] = useState({
   isRunning: false,
@@ -85,7 +86,12 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
 });
 
 const isRunningRef = useRef(false);
+const isPausedRef = useRef(false);
 
+
+  useEffect(() => {
+  isPausedRef.current = isPaused;
+}, [isPaused]);
 
   useEffect(() => {
     isRunningRef.current = executionState.isRunning;
@@ -123,6 +129,24 @@ const isRunningRef = useRef(false);
 
   const executeNode = async (node, pathId = null) => {
   console.log(`[${pathId}] Executing node: ${node.id} - ${node.data.label}`);
+
+  if (isPausedRef.current) {
+    console.log(`[${pathId}] Execution paused - waiting to resume`);
+    
+    while (isPausedRef.current && isRunningRef.current) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (!isRunningRef.current) {
+        throw new Error('Execution was stopped while paused');
+      }
+    }
+    
+    if (!isRunningRef.current) {
+      throw new Error('Execution was stopped');
+    }
+    
+    console.log(`[${pathId}] Execution resumed - continuing`);
+  }
   
   updateExecutionState(prev => ({
     ...prev,
@@ -277,6 +301,11 @@ const isRunningRef = useRef(false);
           console.log('Execution was stopped - breaking polling loop');
           throw new Error('Execution was stopped by user');
         }
+
+        if (isPausedRef.current) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          continue;
+        }
         
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         
@@ -383,6 +412,11 @@ const isRunningRef = useRef(false);
     const checkExecution = () => {
       if (!isRunningRef.current) {
         reject(new Error('Execution was stopped by user'));
+        return;
+      }
+      
+      if (isPausedRef.current) {
+        setTimeout(checkExecution, 100);
         return;
       }
       
@@ -522,6 +556,11 @@ const executeConditionNode = async (node, pathId = null) => {
   while (attempts < maxAttempts) {
     if (!isRunningRef.current) {
       throw new Error('Execution was stopped by user');
+    }
+
+    if (isPausedRef.current) {
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      continue;
     }
     
     const currentCompleted = completionStateRef.current.completedNodes;
@@ -780,6 +819,8 @@ const executeConditionNode = async (node, pathId = null) => {
   const resetFlowState = useCallback(() => {
   setisStart(false);
   isRunningRef.current = false;
+  setIsPaused(false);
+  isPausedRef.current = false;
   
   setNodes(nds => nds.map(n => ({
     ...n,
@@ -805,6 +846,9 @@ const executeConditionNode = async (node, pathId = null) => {
     style: { ...n.style, backgroundColor: undefined, border: undefined }
   })));
   
+  setIsPaused(false); 
+  isPausedRef.current = false;
+  
   resetFlowState();
   
   updateExecutionState(prev => ({
@@ -818,6 +862,36 @@ const executeConditionNode = async (node, pathId = null) => {
 
   console.log('Flow execution stopped by user');
 };
+
+  const handlePauseExecution = async () => {
+  if (isPaused) {
+    console.log('Resuming execution...');
+    setIsPaused(false);
+    
+    updateExecutionState(prev => ({
+      ...prev,
+      executionLog: [...prev.executionLog, {
+        type: 'info',
+        message: 'Execution resumed',
+        timestamp: new Date()
+      }]
+    }));
+    
+  } else {
+    console.log('Pausing execution...');
+    setIsPaused(true);
+    
+    updateExecutionState(prev => ({
+      ...prev,
+      executionLog: [...prev.executionLog, {
+        type: 'warning',
+        message: 'Execution paused',
+        timestamp: new Date()
+      }]
+    }));
+  }
+};
+
 
   const onNodeClick = (e, clickedNode) => {
     if (clickedNode.data.deviceType === 'delay') {
@@ -1240,10 +1314,13 @@ useEffect(() => {
           )}
           
           {!isEditable && executionState.isRunning && (
-            <button className={styles.theme__button}>
-              PAUSE
-            </button>
-          )}
+          <button 
+            className={styles.theme__button} 
+            onClick={handlePauseExecution}
+          >
+            {isPaused ? 'RESUME' : 'PAUSE'}
+          </button>
+        )}
 
           {isEditable && !IsCreatingNew && (
             <button className={styles.theme__button} onClick={handleSaveAsAndStayEditable}>

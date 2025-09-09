@@ -466,3 +466,37 @@ select {
 .sourcenode {
   color: black;
 }
+
+.requiredStar {
+  color: #ff4444;
+  margin-left: 4px;
+}
+
+.fieldError {
+  border: 1px solid #ff4444;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: #fff8f8;
+}
+
+.inputError {
+  border-color: #ff4444 !important;
+  background-color: #fff8f8 !important;
+}
+
+.errorMessage {
+  color: #ff4444;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* File input error state */
+.fileInputLabel.inputError {
+  border: 2px solid #ff4444;
+  background-color: #fff8f8;
+}
+
+.configField {
+  margin-bottom: 15px;
+}
