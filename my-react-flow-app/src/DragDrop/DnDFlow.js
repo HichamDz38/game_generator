@@ -1307,7 +1307,7 @@ useEffect(() => {
             </button>
           )}
 
-          {!isEditable && executionState.isRunning && (
+          {!isEditable && executionState.isRunning && !isPaused &&(
             <button className={styles.theme__button}>
               SKIP
             </button>
