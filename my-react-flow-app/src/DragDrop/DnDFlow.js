@@ -89,6 +89,30 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
     }
   }, [nodes, onNodesChange]);
 
+  const customOnEdgesChange = useCallback((changes) => {
+    if (!isEditable) {
+      return;
+    }
+    onEdgesChange(changes);
+  }, [isEditable, onEdgesChange]);
+
+
+  //disable keys (clavier)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!isEditable && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isEditable]);
+
   const [executionState, setExecutionState] = useState({
   isRunning: false,
   currentNodes: [],
@@ -1388,12 +1412,12 @@ useEffect(() => {
             edges={edges}
             nodeTypes={nodeTypes}  
             onNodesChange={isEditable ? customOnNodesChange : undefined}
-            onEdgesChange={isEditable ? onEdgesChange : undefined}
+            onEdgesChange={isEditable ? customOnEdgesChange : undefined}
             onConnect={isEditable ? onConnect : undefined}
-            onNodeClick={onNodeClick}
+            onNodeClick={isEditable ? onNodeClick : undefined}
             onInit={setRfInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
+            onDrop={isEditable ? onDrop : undefined}
+            onDragOver={isEditable ? onDragOver : undefined}
             nodesDraggable={isEditable}
             nodesConnectable={isEditable}
             elementsSelectable={isEditable}
@@ -1403,6 +1427,7 @@ useEffect(() => {
             panOnDrag={true}
             zoomOnDoubleClick={true}
             selectNodesOnDrag={isEditable}
+            deleteKeyCode={isEditable ? 'Delete' : null}
             fitView
             >
             <Background 
