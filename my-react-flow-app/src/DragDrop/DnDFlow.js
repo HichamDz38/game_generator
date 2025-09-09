@@ -987,9 +987,9 @@ const executeConditionNode = async (node, pathId = null) => {
     }
     
     outputNodes.forEach(outputNode => {
-      const hasIncomingEdge = edges.some(edge => edge.target === outputNode.id);
-      if (!hasIncomingEdge) {
-        errors.push(`Output node must have at least one incoming Edge`);
+      const incomingEdgeCount = edges.filter(edge => edge.target === outputNode.id).length;
+      if (incomingEdgeCount !== 1) {
+        errors.push(`Output node must have exactly one incoming edge (currently has ${incomingEdgeCount})`);
       }
     });
     inputNodes.forEach(inputNode => {
