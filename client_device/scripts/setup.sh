@@ -10,10 +10,10 @@ SCRIPT_DIR="$(pwd)"
 PROG_DIR="$SCRIPT_DIR/../"
 PROG_FILE_NAME="generic_device.py"
 PROG_FILE="$PROG_DIR/$PROG_FILE_NAME"
-REQUIREMENTS_FILE="$PROG_DIR/requirement.txt"
+REQUIREMENTS_FILE="$PROG_DIR/requirment.txt"
 USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
-CONFIG_FILE="./config.env"     # path to your config
+CONFIG_FILE="./scripts/config.env"     # path to your config
 LOG_FILE=/var/log/generic_device.log
 SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
 
