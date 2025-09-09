@@ -5,11 +5,18 @@ set -e
 REPO_URL="https://github.com/GregDMeyer/IT8951.git"
 TMP_DIR="/tmp/it8951"
 SERVICE_NAME="Client_Device.service"
+PYTHON_BIN=/usr/bin/python
 SCRIPT_DIR="$(pwd)"
 PROG_DIR="$SCRIPT_DIR/../"
 PROG_FILE_NAME="generic_device.py"
 PROG_FILE="$PROG_DIR/$PROG_FILE_NAME"
 REQUIREMENTS_FILE="$PROG_DIR/requirement.txt"
+USER_NAME=$(whoami)
+GROUP_NAME=$(id -gn)
+CONFIG_FILE="./config.env"     # path to your config
+LOG_FILE=/var/log/generic_device.log
+SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
+
 
 # === STEP 1: Clone and install IT8951 ===
 echo "[*] Cloning IT8951 repo into $TMP_DIR..."
@@ -18,38 +25,42 @@ git clone "$REPO_URL" "$TMP_DIR"
 
 echo "[*] Installing IT8951..."
 cd "$TMP_DIR"
-pip3 install .
+pip3 install . --break-system-packages
 
 # === STEP 2: Install requirements ===
 cd "$PROG_DIR"
 if [[ -f "$REQUIREMENTS_FILE" ]]; then
     echo "[*] Installing Python requirements..."
-    pip3 install -r "$REQUIREMENTS_FILE"
+    pip3 install -r "$REQUIREMENTS_FILE" --break-system-packages
 else
     echo "[!] No requirement.txt found, skipping..."
 fi
 
+# Load config values
+if [[ -f "$CONFIG_FILE" ]]; then
+    source "$CONFIG_FILE"
+else
+    echo "[!] Config file not found: $CONFIG_FILE"
+    exit 1
+fi
+
 # === STEP 3: Configure client.py ===
-echo
-read -p "Enter server IP address (leave empty to keep default): " NEW_IP
-if [[ -n "$NEW_IP" ]]; then
-    sed -i "s/^\( *HOST *= *\).*/\1\"$NEW_IP\"/" "$PROG_FILE"
-    echo "[*] Updated server IP in $PROG_FILE_NAME → $NEW_IP"
+echo "[*] Updating $PROG_FILE_NAME using $CONFIG_FILE"
+
+if [[ -n "$HOST" ]]; then
+    sed -i "s/^\( *HOST *= *\).*/\1\"$HOST\"/" "$PROG_FILE"
+    echo " → HOST set to $HOST"
 fi
 
-read -p "Enter DEVICE_ID (leave empty to keep default): " NEW_ID
-if [[ -n "$NEW_ID" ]]; then
-    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$NEW_ID\"/" "$PROG_FILE"
-    echo "[*] Updated DEVIC_NAME in $PROG_FILE_NAME → $NEW_ID"
+if [[ -n "$DEVICE_ID" ]]; then
+    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$DEVICE_ID\"/" "$PROG_FILE"
+    echo " → DEVICE_ID set to $DEVICE_ID"
 fi
 
-read -p "Enter N_HINT (leave empty to keep default): " NEW_N_HINT
-if [[ -n "$NEW_ID" ]]; then
-    sed -i "s/^\( *N_HINT *= *\).*/\1\"$NEW_ID\"/" "$PROG_FILE"
-    echo "[*] Updated N_HINTS in $PROG_FILE_NAME → $NEW_ID"
+if [[ -n "$N_HINT" ]]; then
+    sed -i "s/^\( *N_HINT *= *\).*/\1\"$N_HINT\"/" "$PROG_FILE"
+    echo " → N_HINT set to $N_HINT"
 fi
-
-
 chmod +x "$PROG_FILE"
 
 # === STEP 4: Create systemd service ===
@@ -58,15 +69,18 @@ echo "[*] Creating systemd service at $SERVICE_PATH..."
 
 sudo tee "$SERVICE_PATH" > /dev/null <<EOF
 [Unit]
-Description=Python Client Script ($PROG_FILE_NAME)
+Description=Generic_Device_Client for ($PROG_FILE_NAME)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 $PROG_FILE
+User=$USER_NAME
+Group=$GROUP_NAME
+ExecStart=$PYTHON_BIN $PROG_FILE
 WorkingDirectory=$SCRIPT_DIR
+StandardOutput=append:$LOG_FILE
+StandardError=append:$LOG_FILE
 Restart=always
 RestartSec=5
-User=$USER
 
 [Install]
 WantedBy=multi-user.target
