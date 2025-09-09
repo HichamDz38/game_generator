@@ -71,6 +71,24 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
   const [isPaused, setIsPaused] = useState(false);
 
+
+  const customOnNodesChange = useCallback((changes) => {
+    const filteredChanges = changes.filter(change => {
+      if (change.type === 'remove') {
+        const nodeToRemove = nodes.find(node => node.id === change.id);
+        if (nodeToRemove && (nodeToRemove.type === 'input' || nodeToRemove.type === 'output')) {
+          console.log('Cannot delete input or output nodes');
+          return false;
+        }
+      }
+      return true;
+    });
+    
+    if (filteredChanges.length > 0) {
+      onNodesChange(filteredChanges);
+    }
+  }, [nodes, onNodesChange]);
+
   const [executionState, setExecutionState] = useState({
   isRunning: false,
   currentNodes: [],
@@ -1369,7 +1387,7 @@ useEffect(() => {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}  
-            onNodesChange={isEditable ? onNodesChange : undefined}
+            onNodesChange={isEditable ? customOnNodesChange : undefined}
             onEdgesChange={isEditable ? onEdgesChange : undefined}
             onConnect={isEditable ? onConnect : undefined}
             onNodeClick={onNodeClick}
