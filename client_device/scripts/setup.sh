@@ -15,6 +15,7 @@ USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
 CONFIG_FILE="./scripts/config.env"     # path to your config
 LOG_FILE=/var/log/generic_device.log
+ERR_LOG_FILE=/var/log/generic_device.log
 SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
 
 
@@ -44,7 +45,7 @@ else
     exit 1
 fi
 
-# === STEP 3: Configure client.py ===
+# === STEP 3: Configure generic_device.py ===
 echo "[*] Updating $PROG_FILE_NAME using $CONFIG_FILE"
 
 if [[ -n "$HOST" ]]; then
@@ -60,6 +61,16 @@ fi
 if [[ -n "$N_HINT" ]]; then
     sed -i "s/^\( *N_HINT *= *\).*/\1\"$N_HINT\"/" "$PROG_FILE"
     echo " → N_HINT set to $N_HINT"
+fi
+#configure display type
+if [[ "$DISPLAY_TYPE" == "epaper" ]]; then
+    sed -i 's|^from .* as display_img|from display import main as display_img|' "$PROG_FILE"
+    echo " → Display type set to EPAPER (display.py)"
+elif [[ "$DISPLAY_TYPE" == "monitor" ]]; then
+    sed -i 's|^from .* as display_img|from splash import cast as display_img|' "$PROG_FILE"
+    echo " → Display type set to MONITOR (splash.py)"
+else
+    echo "[!] DISPLAY_TYPE not set correctly in $CONFIG_FILE (expected 'epaper' or 'monitor')"
 fi
 chmod +x "$PROG_FILE"
 
@@ -78,7 +89,7 @@ Group=$GROUP_NAME
 ExecStart=$PYTHON_BIN $PROG_FILE
 WorkingDirectory=$PROG_DIR
 StandardOutput=append:$LOG_FILE
-StandardError=append:$LOG_FILE
+StandardError=append:$ERR_LOG_FILE
 Restart=always
 RestartSec=5
 
@@ -102,7 +113,7 @@ cat > "$DISABLE_SCRIPT" <<EOF
 #!/usr/bin/env bash
 sudo systemctl stop $SERVICE_NAME
 sudo systemctl disable $SERVICE_NAME
-sudo rm -f /etc/systemd/system/$SERVICE_NAME
+#sudo rm -f /etc/systemd/system/$SERVICE_NAME
 sudo systemctl daemon-reload
 echo "[*] Autostart disabled and service removed for $PROG_FILE_NAME"
 EOF
