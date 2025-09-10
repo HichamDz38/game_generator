@@ -92,6 +92,7 @@ StandardOutput=append:$LOG_FILE
 StandardError=append:$ERR_LOG_FILE
 Restart=always
 RestartSec=5
+Environment="PYTHONUNBUFFERED=1"
 
 [Install]
 WantedBy=multi-user.target
