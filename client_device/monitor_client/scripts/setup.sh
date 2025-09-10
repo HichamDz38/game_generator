@@ -192,3 +192,29 @@ EOF
 
 chmod +x "$UNINSTALL_SCRIPT"
 echo "➡ Uninstall script created at $UNINSTALL_SCRIPT"
+
+
+echo "[*] Enabling SSH..."
+sudo systemctl enable ssh
+sudo systemctl start ssh
+
+echo "[*] Enabling SPI..."
+sudo raspi-config nonint do_spi 0 || {
+    # fallback if raspi-config not used
+    sudo sed -i 's/^#dtparam=spi=on/dtparam=spi=on/' /boot/config.txt
+    grep -q '^dtparam=spi=on' /boot/config.txt || echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
+}
+
+echo "[*] Enabling auto-login on console..."
+sudo raspi-config nonint do_boot_behaviour B2 || {
+    # fallback without raspi-config
+    sudo ln -fs /etc/systemd/system/autologin@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
+}
+
+echo "[*] Setting boot to console (not desktop)..."
+sudo raspi-config nonint do_boot_behaviour B1 || {
+    # fallback without raspi-config
+    sudo systemctl set-default multi-user.target
+}
+
+echo "✅ Done! Reboot to apply changes."
