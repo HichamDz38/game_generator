@@ -124,3 +124,71 @@ echo
 echo "✅ Setup complete!"
 echo "➡ Use ./enable_autostart.sh to enable autostart."
 echo "➡ Use ./disable_autostart.sh to remove autostart."
+
+
+# === STEP 6: Create uninstall.sh ===
+UNINSTALL_SCRIPT="$SCRIPT_DIR/uninstall.sh"
+
+cat > "$UNINSTALL_SCRIPT" <<EOF
+#!/usr/bin/env bash
+set -e
+
+SERVICE_NAME="$SERVICE_NAME"
+SERVICE_PATH="/etc/systemd/system/\$SERVICE_NAME"
+SCRIPT_DIR="$(pwd)"
+PROG_DIR="$(realpath \$SCRIPT_DIR/../)"
+PROG_FILE_NAME="$PROG_FILE_NAME"
+PROG_FILE="\$PROG_DIR/\$PROG_FILE_NAME"
+ENABLE_SCRIPT="\$SCRIPT_DIR/enable_autostart.sh"
+DISABLE_SCRIPT="\$SCRIPT_DIR/disable_autostart.sh"
+LOG_FILE="$LOG_FILE"
+ERR_LOG_FILE="$ERR_LOG_FILE"
+
+echo "[*] Starting uninstall process..."
+
+# === STEP 1: Stop & disable service ===
+if systemctl list-units --full -all | grep -q "\$SERVICE_NAME"; then
+    echo "[*] Stopping service \$SERVICE_NAME..."
+    sudo systemctl stop "\$SERVICE_NAME" || true
+    sudo systemctl disable "\$SERVICE_NAME" || true
+    sudo rm -f "\$SERVICE_PATH"
+    sudo systemctl daemon-reload
+    echo " → Service removed"
+else
+    echo "[!] Service \$SERVICE_NAME not found, skipping..."
+fi
+
+# === STEP 2: Remove helper scripts ===
+rm -f "\$ENABLE_SCRIPT" "\$DISABLE_SCRIPT"
+echo " → Helper scripts removed"
+
+# === STEP 3: Remove Python packages installed ===
+echo "[*] Removing installed Python packages..."
+pip3 uninstall -y it8951 || true
+if [[ -f "\$PROG_DIR/requirment.txt" ]]; then
+    pip3 uninstall -y -r "\$PROG_DIR/requirment.txt" || true
+fi
+
+# === STEP 4: Clean logs ===
+echo "[*] Removing logs..."
+sudo rm -f "\$LOG_FILE" "\$ERR_LOG_FILE"
+
+# === STEP 5: Remove whole project folder (optional cleanup) ===
+
+echo
+read -p "⚠️  Do you really want to delete the whole project folder at '\$PROG_DIR'? [y/N]: " CONFIRM
+if [[ "\$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "[*] Removing project folder \$PROG_DIR..."
+    rm -rf "\$PROG_DIR"
+    echo " → Project removed"
+else
+    echo "[!] Skipping project folder removal."
+fi
+
+
+echo
+echo "✅ Uninstall complete!"
+EOF
+
+chmod +x "$UNINSTALL_SCRIPT"
+echo "➡ Uninstall script created at $UNINSTALL_SCRIPT"
