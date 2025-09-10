@@ -15,7 +15,7 @@ USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
 CONFIG_FILE="./scripts/config.env"     # path to your config
 LOG_FILE=/var/log/generic_device.log
-ERR_LOG_FILE=/var/log/generic_device.log
+ERR_LOG_FILE=/var/log/generic_device_err.log
 SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
 
 
