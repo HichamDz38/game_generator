@@ -71,6 +71,48 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
   const [isPaused, setIsPaused] = useState(false);
 
+
+  const customOnNodesChange = useCallback((changes) => {
+    const filteredChanges = changes.filter(change => {
+      if (change.type === 'remove') {
+        const nodeToRemove = nodes.find(node => node.id === change.id);
+        if (nodeToRemove && (nodeToRemove.type === 'input' || nodeToRemove.type === 'output')) {
+          console.log('Cannot delete input or output nodes');
+          return false;
+        }
+      }
+      return true;
+    });
+    
+    if (filteredChanges.length > 0) {
+      onNodesChange(filteredChanges);
+    }
+  }, [nodes, onNodesChange]);
+
+  const customOnEdgesChange = useCallback((changes) => {
+    if (!isEditable) {
+      return;
+    }
+    onEdgesChange(changes);
+  }, [isEditable, onEdgesChange]);
+
+
+  //disable keys (clavier)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!isEditable && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isEditable]);
+
   const [executionState, setExecutionState] = useState({
   isRunning: false,
   currentNodes: [],
@@ -987,9 +1029,9 @@ const executeConditionNode = async (node, pathId = null) => {
     }
     
     outputNodes.forEach(outputNode => {
-      const hasIncomingEdge = edges.some(edge => edge.target === outputNode.id);
-      if (!hasIncomingEdge) {
-        errors.push(`Output node must have at least one incoming Edge`);
+      const incomingEdgeCount = edges.filter(edge => edge.target === outputNode.id).length;
+      if (incomingEdgeCount !== 1) {
+        errors.push(`Output node must have exactly one incoming edge (currently has ${incomingEdgeCount})`);
       }
     });
     inputNodes.forEach(inputNode => {
@@ -1307,7 +1349,7 @@ useEffect(() => {
             </button>
           )}
 
-          {!isEditable && executionState.isRunning && (
+          {!isEditable && executionState.isRunning && !isPaused &&(
             <button className={styles.theme__button}>
               SKIP
             </button>
@@ -1369,13 +1411,13 @@ useEffect(() => {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}  
-            onNodesChange={isEditable ? onNodesChange : undefined}
-            onEdgesChange={isEditable ? onEdgesChange : undefined}
+            onNodesChange={isEditable ? customOnNodesChange : undefined}
+            onEdgesChange={isEditable ? customOnEdgesChange : undefined}
             onConnect={isEditable ? onConnect : undefined}
-            onNodeClick={onNodeClick}
+            onNodeClick={isEditable ? onNodeClick : undefined}
             onInit={setRfInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
+            onDrop={isEditable ? onDrop : undefined}
+            onDragOver={isEditable ? onDragOver : undefined}
             nodesDraggable={isEditable}
             nodesConnectable={isEditable}
             elementsSelectable={isEditable}
@@ -1385,6 +1427,7 @@ useEffect(() => {
             panOnDrag={true}
             zoomOnDoubleClick={true}
             selectNodesOnDrag={isEditable}
+            deleteKeyCode={isEditable ? 'Delete' : null}
             fitView
             >
             <Background 
