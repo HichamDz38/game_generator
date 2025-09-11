@@ -4,18 +4,18 @@ set -e
 # === CONFIG ===
 REPO_URL="https://github.com/GregDMeyer/IT8951.git"
 TMP_DIR="/tmp/it8951"
-SERVICE_NAME="Client_Device.service"
+SERVICE_NAME="Client_Device_epaper.service"
 PYTHON_BIN=/usr/bin/python
 SCRIPT_DIR="$(pwd)"
 PROG_DIR="$(realpath $SCRIPT_DIR/../)"
-PROG_FILE_NAME="generic_device.py"
+PROG_FILE_NAME="client.py"
 PROG_FILE="$PROG_DIR/$PROG_FILE_NAME"
 REQUIREMENTS_FILE="$PROG_DIR/requirment.txt"
 USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
 CONFIG_FILE="./scripts/config.env"     # path to your config
-LOG_FILE=/var/log/generic_device.log
-ERR_LOG_FILE=/var/log/generic_device_err.log
+LOG_FILE=/var/log/epaper_device.log
+ERR_LOG_FILE=/var/log/epaper_device_err.log
 SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
 
 
@@ -45,7 +45,7 @@ else
     exit 1
 fi
 
-# === STEP 3: Configure generic_device.py ===
+# === STEP 3: Configure client.py ===
 echo "[*] Updating $PROG_FILE_NAME using $CONFIG_FILE"
 
 if [[ -n "$HOST" ]]; then
@@ -53,25 +53,16 @@ if [[ -n "$HOST" ]]; then
     echo " → HOST set to $HOST"
 fi
 
-if [[ -n "$DEVICE_ID" ]]; then
-    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$DEVICE_ID\"/" "$PROG_FILE"
-    echo " → DEVICE_ID set to $DEVICE_ID"
+if [[ -n "$DEVICE_NAME" ]]; then
+    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$DEVICE_NAME\"/" "$PROG_FILE"
+    echo " → DEVICE_ID set to $DEVICE_NAME"
 fi
 
 if [[ -n "$N_HINT" ]]; then
     sed -i "s/^\( *N_HINT *= *\).*/\1\"$N_HINT\"/" "$PROG_FILE"
     echo " → N_HINT set to $N_HINT"
 fi
-#configure display type
-if [[ "$DISPLAY_TYPE" == "epaper" ]]; then
-    sed -i 's|^from .* as display_img|from display import main as display_img|' "$PROG_FILE"
-    echo " → Display type set to EPAPER (display.py)"
-elif [[ "$DISPLAY_TYPE" == "monitor" ]]; then
-    sed -i 's|^from .* as display_img|from splash import cast as display_img|' "$PROG_FILE"
-    echo " → Display type set to MONITOR (splash.py)"
-else
-    echo "[!] DISPLAY_TYPE not set correctly in $CONFIG_FILE (expected 'epaper' or 'monitor')"
-fi
+
 chmod +x "$PROG_FILE"
 
 # === STEP 4: Create systemd service ===
@@ -80,7 +71,7 @@ echo "[*] Creating systemd service at $SERVICE_PATH..."
 
 sudo tee "$SERVICE_PATH" > /dev/null <<EOF
 [Unit]
-Description=Generic_Device_Client for ($PROG_FILE_NAME)
+Description=autostart for E-Paper client 
 After=network.target
 
 [Service]

@@ -87,6 +87,6 @@ The installer script automatically:
 
 Reads values from config.env
 
-Updates client.py
+Updates generic_device.py
 
 Installs/updates the systemd unit

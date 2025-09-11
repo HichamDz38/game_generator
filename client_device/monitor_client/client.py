@@ -34,7 +34,7 @@ class GeniricDevice():
         image_data = response.content
         with open("image.png", "wb") as f:
             f.write(image_data)
-        display_img("image.png",time.strftime("%H:%M:%S"))
+        display_img("image.png",time.strftime("%H:%M:%S"),300)
         self.device_info["status"] = "completed"
             
 
@@ -114,7 +114,7 @@ class GeniricDevice():
                 remaining -= len(chunk)
 
 if __name__ == "__main__":
-    DEVIC_NAME = "Device3"
+    DEVIC_NAME = "Monitor_"
     N_HINTS = 2
     device = GeniricDevice(DEVIC_NAME, N_HINTS)
     device.connect()

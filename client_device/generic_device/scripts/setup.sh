@@ -2,50 +2,25 @@
 set -e
 
 # === CONFIG ===
-SERVICE_NAME="Client_Device_Monitor.service"
+REPO_URL="https://github.com/GregDMeyer/IT8951.git"
+TMP_DIR="/tmp/it8951"
+SERVICE_NAME="Client_Device.service"
 PYTHON_BIN=/usr/bin/python
 SCRIPT_DIR="$(pwd)"
 PROG_DIR="$(realpath $SCRIPT_DIR/../)"
-PROG_FILE_NAME="client.py"
+PROG_FILE_NAME="generic_device.py"
 PROG_FILE="$PROG_DIR/$PROG_FILE_NAME"
 REQUIREMENTS_FILE="$PROG_DIR/requirment.txt"
 USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
 CONFIG_FILE="./scripts/config.env"     # path to your config
-LOG_FILE=/var/log/monitor_device_client.log
-ERR_LOG_FILE=/var/log/monitor_device_client_err.log
+LOG_FILE=/var/log/generic_device.log
+ERR_LOG_FILE=/var/log/generic_device_err.log
 SERVICE_FILE=/etc/systemd/system/$SERVICE_NAME.service
-DISPLAY_TYPE="monitor"
 
 
 
-# === STEP 1: Prepare the PI by removing the display and enabling SSH and enabling SPI ===
-echo "[*] Enabling SSH..."
-sudo systemctl enable ssh
-sudo systemctl start ssh
-
-echo "[*] Enabling SPI..."
-sudo raspi-config nonint do_spi 0 || {
-    # fallback if raspi-config not used
-    sudo sed -i 's/^#dtparam=spi=on/dtparam=spi=on/' /boot/config.txt
-    grep -q '^dtparam=spi=on' /boot/config.txt || echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
-}
-
-echo "[*] Enabling auto-login on console..."
-sudo raspi-config nonint do_boot_behaviour B2 || {
-    # fallback without raspi-config
-    sudo ln -fs /etc/systemd/system/autologin@.service /etc/systemd/system/getty.target.wants/getty@tty1.service
-}
-
-echo "[*] Setting boot to console (not desktop)..."
-sudo raspi-config nonint do_boot_behaviour B1 || {
-    # fallback without raspi-config
-    sudo systemctl set-default multi-user.target
-}
-
-echo "✅ Done! Reboot to apply changes."
-
-# === STEP 2: Install requirements ===
+# === STEP : Install requirements ===
 cd "$PROG_DIR"
 if [[ -f "$REQUIREMENTS_FILE" ]]; then
     echo "[*] Installing Python requirements..."
@@ -62,7 +37,7 @@ else
     exit 1
 fi
 
-# === STEP 3: Configure client.py ===
+# === STEP : Configure generic_device.py ===
 echo "[*] Updating $PROG_FILE_NAME using $CONFIG_FILE"
 
 if [[ -n "$HOST" ]]; then
@@ -70,25 +45,34 @@ if [[ -n "$HOST" ]]; then
     echo " → HOST set to $HOST"
 fi
 
-if [[ -n "$DEVICE_NAME" ]]; then
-    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$DEVICE_NAME\"/" "$PROG_FILE"
-    echo " → DEVICE_NAME set to $DEVICE_NAME"
+if [[ -n "$DEVICE_ID" ]]; then
+    sed -i "s/^\( *DEVIC_NAME *= *\).*/\1\"$DEVICE_ID\"/" "$PROG_FILE"
+    echo " → DEVICE_ID set to $DEVICE_ID"
 fi
 
 if [[ -n "$N_HINT" ]]; then
     sed -i "s/^\( *N_HINT *= *\).*/\1\"$N_HINT\"/" "$PROG_FILE"
     echo " → N_HINT set to $N_HINT"
 fi
-
+#configure display type
+if [[ "$DISPLAY_TYPE" == "epaper" ]]; then
+    sed -i 's|^from .* as display_img|from display import main as display_img|' "$PROG_FILE"
+    echo " → Display type set to EPAPER (display.py)"
+elif [[ "$DISPLAY_TYPE" == "monitor" ]]; then
+    sed -i 's|^from .* as display_img|from splash import cast as display_img|' "$PROG_FILE"
+    echo " → Display type set to MONITOR (splash.py)"
+else
+    echo "[!] DISPLAY_TYPE not set correctly in $CONFIG_FILE (expected 'epaper' or 'monitor')"
+fi
 chmod +x "$PROG_FILE"
 
-# === STEP 4: Create systemd service ===
+# === STEP : Create systemd service ===
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
 echo "[*] Creating systemd service at $SERVICE_PATH..."
 
 sudo tee "$SERVICE_PATH" > /dev/null <<EOF
 [Unit]
-Description=Autostart_Device_Client for ($PROG_FILE_NAME)
+Description=Generic_Device_Client for ($PROG_FILE_NAME)
 After=network.target
 
 [Service]
@@ -106,7 +90,7 @@ Environment="PYTHONUNBUFFERED=1"
 WantedBy=multi-user.target
 EOF
 
-# === STEP 5: Helper scripts ===
+# === STEP : Helper scripts ===
 ENABLE_SCRIPT="$SCRIPT_DIR/enable_autostart.sh"
 DISABLE_SCRIPT="$SCRIPT_DIR/disable_autostart.sh"
 
@@ -134,7 +118,7 @@ echo "➡ Use ./enable_autostart.sh to enable autostart."
 echo "➡ Use ./disable_autostart.sh to remove autostart."
 
 
-# === STEP 6: Create uninstall.sh ===
+# === STEP : Create uninstall.sh ===
 UNINSTALL_SCRIPT="$SCRIPT_DIR/uninstall.sh"
 
 cat > "$UNINSTALL_SCRIPT" <<EOF
@@ -170,29 +154,9 @@ fi
 rm -f "\$ENABLE_SCRIPT" "\$DISABLE_SCRIPT"
 echo " → Helper scripts removed"
 
-# === STEP 3: Remove Python packages installed ===
-echo "[*] Removing installed Python packages..."
-pip3 uninstall -y it8951 || true
-if [[ -f "\$PROG_DIR/requirment.txt" ]]; then
-    pip3 uninstall -y -r "\$PROG_DIR/requirment.txt" || true
-fi
-
-# === STEP 4: Clean logs ===
+# === STEP 3: Clean logs ===
 echo "[*] Removing logs..."
 sudo rm -f "\$LOG_FILE" "\$ERR_LOG_FILE"
-
-# === STEP 5: Remove whole project folder (optional cleanup) ===
-
-echo
-read -p "⚠️  Do you really want to delete the whole project folder at '\$PROG_DIR'? [y/N]: " CONFIRM
-if [[ "\$CONFIRM" =~ ^[Yy]$ ]]; then
-    echo "[*] Removing project folder \$PROG_DIR..."
-    rm -rf "\$PROG_DIR"
-    echo " → Project removed"
-else
-    echo "[!] Skipping project folder removal."
-fi
-
 
 echo
 echo "✅ Uninstall complete!"
@@ -200,5 +164,3 @@ EOF
 
 chmod +x "$UNINSTALL_SCRIPT"
 echo "➡ Uninstall script created at $UNINSTALL_SCRIPT"
-
-

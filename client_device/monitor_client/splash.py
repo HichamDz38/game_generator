@@ -73,7 +73,7 @@ def show(img_path,text_to_insert):
     with open("/dev/fb0", "wb") as f:
         f.write(fb_bytes)
 
-def cast(img_path,text_to_insert):
+def cast(img_path,text_to_insert,font_size):
 
     pygame.init()
 
@@ -82,7 +82,7 @@ def cast(img_path,text_to_insert):
     pygame.mouse.set_visible(False)
 
     # Font for overlay text
-    font = pygame.font.SysFont("DejaVuSans", 200)
+    font = pygame.font.SysFont("DejaVuSans", font_size)
     def show_image(path, overlay_text):
         # Load image
         img = pygame.image.load(path)
@@ -94,7 +94,7 @@ def cast(img_path,text_to_insert):
         # Draw text overlay (white text, black background)
         if overlay_text:
             text_surface = font.render(overlay_text, True, (255, 255, 255), (0, 0, 0))
-            text_rect = text_surface.get_rect(bottomright=(screen.get_width() - 20, screen.get_height() - 20))
+            text_rect = text_surface.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
             screen.blit(text_surface, text_rect)
 
         # Update display

@@ -1,9 +1,7 @@
 import socket
 import json
 import requests
-#from display import main as display_img
-from splash import cast as display_img 
-#from splash import show as display_img 
+from display import main as display_img
 import time
 
 class GeniricDevice():
@@ -34,7 +32,7 @@ class GeniricDevice():
         image_data = response.content
         with open("image.png", "wb") as f:
             f.write(image_data)
-        display_img("image.png",time.strftime("%H:%M:%S"))
+        display_img("image.png")
         self.device_info["status"] = "completed"
             
 
@@ -114,8 +112,7 @@ class GeniricDevice():
                 remaining -= len(chunk)
 
 if __name__ == "__main__":
-    DEVIC_NAME = "Device3"
+    DEVIC_NAME = "E-PAPER_"
     N_HINTS = 2
     device = GeniricDevice(DEVIC_NAME, N_HINTS)
     device.connect()
-    
