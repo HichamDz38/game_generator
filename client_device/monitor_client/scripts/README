@@ -1,0 +1,82 @@
+# Device Client Service
+
+This project runs a Python client (`client.py`) as a **systemd service** on a Linux machine (e.g. Raspberry Pi).  
+It automatically configures the client based on a `config.env` file, so you can easily deploy the same code to multiple devices.
+
+---
+
+## 📂 Project Structure
+project/
+│── client.py
+│── config.env
+│── setup.sh
+└── service/ (optional)
+---
+
+## ⚙️ Configuration (`config.env`)
+Create a `config.env` file in the script folder:
+```ini
+
+# Server configuration
+HOST=192.168.1.50
+DEVICE_ID=my_device_123
+N_HINT=42
+
+# Display type: epaper | monitor
+DISPLAY_TYPE=monitor
+
+```
+## ▶️ Installation
+
+Clone the repo and edit config.env:
+```bash
+nano config.env
+```
+Go to the script folder then
+run the installer script:
+```bash
+chmod +x install_service.sh
+./install_service.sh
+```
+
+Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable Client_Device.service
+sudo systemctl start Client_Device.service
+```
+
+---
+## 🔍 Logs & Debugging
+
+Check logs:
+
+You can change logs location in setup.sh  LOG_FILE
+
+
+Stop service:
+```bash
+sudo systemctl stop Client_Device.service
+```
+
+Restart service:
+```bash
+sudo systemctl restart Client_Device.service
+```
+or use the scripts generated with setup.sh
+
+## 🛠️ Development Notes
+
+System-wide Python dependencies are installed with:
+
+```bash
+sudo pip3 install -r requirements.txt --break-system-packages
+```
+
+The installer script automatically:
+
+Reads values from config.env
+
+Updates generic_device.py
+
+Installs/updates the systemd unit
