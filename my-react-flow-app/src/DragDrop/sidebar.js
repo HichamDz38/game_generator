@@ -156,29 +156,31 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
           Timer
         </div>
         <div
-          className="dndnode device"
-          onDragStart={(event) => {
-            const uniqueId = generateUniqueId();
-            onDragStart(
-              event,
-              'condition',
-              `Condition-${uniqueId}`,
-              {
-                "sources": {
-                  'type': 'object',
-                  'value': {},
-                  'required': false
-                }
-              },
-              null, 
-              uniqueId,
-              null
-            );
-          }}
-          draggable
-        > 
-          Condition
-        </div>
+  className="dndnode device"
+  onDragStart={(event) => {
+    const uniqueId = generateUniqueId();
+    onDragStart(
+      event,
+      'condition',
+      `Condition-${uniqueId}`,
+      {
+        "logicType": {
+          'type': 'select',
+          'options': ['AND', 'OR'],
+          'value': 'AND', 
+          'required': true,
+          'label': 'Logic Type'
+        }
+      },
+      { deviceType: 'condition' }, 
+      uniqueId,
+      null
+    );
+    }}
+        draggable
+      > 
+        Condition
+      </div>
       </div>
     </aside>
   );

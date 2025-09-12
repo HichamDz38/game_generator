@@ -40,97 +40,104 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
     }
 
     if (nodeData && nodeData.data?.deviceType === 'condition') {
-      const sourceNodeIds = edges
-        .filter(edge => edge.target === nodeData.id)
-        .map(edge => edge.source);
-      
-      const sourceNodes = nodes.filter(node => 
-        sourceNodeIds.includes(node.id) && 
-        node.type !== 'input'
-      );
-      
-      setConnectedSources(sourceNodes);
+    const sourceNodeIds = edges
+      .filter(edge => edge.target === nodeData.id)
+      .map(edge => edge.source);
+    
+    const sourceNodes = nodes.filter(node => 
+      sourceNodeIds.includes(node.id) && 
+      node.type !== 'input'
+    );
+    
+    setConnectedSources(sourceNodes);
 
       if (nodeData.data.config) {
-        sourceNodes.forEach(sourceNode => {
-          const checkboxKey = `source_${sourceNode.id}`;
-          if (!nodeData.data.config[checkboxKey]) {
-            nodeData.data.config[checkboxKey] = {
-              type: 'checkbox',
-              value: false,
-              sourceNodeId: sourceNode.id,
-              sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
-            };
-          }
-          setConfigValues(prev => ({
-            ...prev,
-            [checkboxKey]: nodeData.data.config[checkboxKey]?.value || false
-          }));
-        });
-      }
+      const newConfigValues = { ...configValues };
+      const newConfig = { ...nodeData.data.config };
+      
+      sourceNodes.forEach(sourceNode => {
+        const checkboxKey = `source_${sourceNode.id}`;
+        
+        if (!newConfig[checkboxKey]) {
+          newConfig[checkboxKey] = {
+            type: 'checkbox',
+            value: false,
+            sourceNodeId: sourceNode.id,
+            sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
+          };
+        }
+        
+        newConfigValues[checkboxKey] = newConfig[checkboxKey]?.value || false;
+      });
+      
+      nodeData.data.config = newConfig;
+      setConfigValues(newConfigValues);
     }
-  }, [nodeData, nodes, edges]);
+  }
+}, [nodeData, nodes, edges]);
 
   const handleInputChange = (fieldName, value) => {
-    setConfigValues(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
-    
-    if (nodeData.data.config[fieldName]) {
+  setConfigValues(prev => ({
+    ...prev,
+    [fieldName]: value
+  }));
+  
+  if (nodeData.data.config[fieldName]) {
+    if (fieldName === 'logicType') {
+      nodeData.data.config[fieldName].value = value;
+      console.log(`Logic type set to: ${value}`);
+    } else {
       nodeData.data.config[fieldName].value = value;
     }
+  }
 
-    if (validationErrors[fieldName]) {
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[fieldName];
-        return newErrors;
-      });
-    }
-  };
+  if (validationErrors[fieldName]) {
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldName];
+      return newErrors;
+    });
+  }
+};
 
   const validateRequiredFields = () => {
   const errors = {};
   let isValid = true;
 
-  if (nodeData && nodeData.data && nodeData.data.config) {
-    Object.keys(nodeData.data.config).forEach(fieldName => {
-      const config = nodeData.data.config[fieldName];
-      
-      if (fieldName.startsWith('source_')) {
-        return;
+  Object.keys(nodeData.data.config).forEach((item) => {
+    const config = nodeData.data.config[item];
+    
+    if (item.startsWith('source_')) {
+      return;
+    }
+
+    if (item === 'logicType' && config.required) {
+      const value = configValues[item] || config.value;
+      if (!value || !['AND', 'OR'].includes(String(value).toUpperCase())) {
+        errors[item] = 'Logic type must be AND or OR';
+        isValid = false;
       }
-
-      if (config.required) {
-        const value = configValues[fieldName];
-        let isEmpty = false;
-
-        switch (config.type) {
-          case 'text':
-          case 'number':
-          case 'select':
-            isEmpty = value === '' || value === null || value === undefined;
-            break;
-          case 'checkbox':
-            isEmpty = value === false || value === 'false';
-            break;
-          case 'file':
-            const hasValidFile = config.value && config.value.startsWith('/static/uploads/');
-            const isUploading = config.tempDataUrl;
-            isEmpty = !hasValidFile && !isUploading;
-            break;
-          default:
-            isEmpty = !value;
+    }
+    
+    if (config.required) {
+      if (config.type === 'file') {
+        if (!config.value && !config.tempDataUrl) {
+          errors[item] = 'This field is required';
+          isValid = false;
         }
-
-        if (isEmpty) {
-          errors[fieldName] = `${fieldName} is required`;
+      } else if (config.type === 'checkbox') {
+        if (configValues[item] === undefined || configValues[item] === null) {
+          errors[item] = 'This field is required';
+          isValid = false;
+        }
+      } else {
+        if (!configValues[item] && configValues[item] !== 0 && configValues[item] !== false) {
+          errors[item] = 'This field is required';
           isValid = false;
         }
       }
-    });
-  }
+    }
+  });
 
   setValidationErrors(errors);
   return isValid;
@@ -210,6 +217,13 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
     return;
   }
 
+  // if (nodeData.data.config.logicType) {
+  //   const logicTypeValue = configValues.logicType || nodeData.data.config.logicType.value;
+  //   nodeData.data.config.logicType.value = String(logicTypeValue).toUpperCase();
+  // }
+
+  console.log('Saving node with config:', nodeData.data.config);
+
   const hasUploadingRequiredFiles = Object.keys(nodeData.data.config).some(key => {
     const config = nodeData.data.config[key];
     return config.required && 
@@ -226,10 +240,27 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   const formElements = containerRef.current.querySelectorAll('input, select, textarea');
   formElements.forEach(element => {
     if (element.type !== 'file') {
-      if (element.type === 'checkbox') {
-        nodeData.data.config[element.name].value = element.checked;
+      if (nodeData.data.config[element.name]) {
+        if (element.type === 'checkbox') {
+          nodeData.data.config[element.name].value = element.checked;
+        } else {
+          nodeData.data.config[element.name].value = element.value;
+        }
       } else {
-        nodeData.data.config[element.name].value = element.value;
+        if (element.name.startsWith('source_')) {
+          if (!nodeData.data.config[element.name]) {
+            const sourceNodeId = element.name.replace('source_', '');
+            const sourceNode = nodes.find(node => node.id === sourceNodeId);
+            nodeData.data.config[element.name] = {
+              type: 'checkbox',
+              value: element.checked,
+              sourceNodeId: sourceNodeId,
+              sourceNodeLabel: sourceNode?.data?.label || `Node ${sourceNodeId}`
+            };
+          } else {
+            nodeData.data.config[element.name].value = element.checked;
+          }
+        }
       }
     }
   });
@@ -265,6 +296,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
         {nodeData.data?.deviceType === 'condition' && connectedSources.length > 0 && (
           <div className={styles.connectedSources}>
             <h4>Connected Source Nodes:</h4>
+            
             {connectedSources.map(sourceNode => {
               const checkboxKey = `source_${sourceNode.id}`;
               const config = nodeData.data.config[checkboxKey] || {
@@ -293,6 +325,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
           </div>
         )}
 
+
         <div className={styles.nodeDetailsConfig}>
           {Object.keys(nodeData.data.config).map((item) => {
             const value = nodeData.data.config[item];
@@ -314,7 +347,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
                     {value.type === "select" ? (
                       <select 
                         name={item} 
-                        value={configValues[item] || ''} 
+                        value={configValues[item] || nodeData.data.config[item]?.value || ''} 
                         onChange={(e) => handleInputChange(item, e.target.value)}
                         className={`${styles.optionNodeDetails} ${hasError ? styles.inputError : ''}`}
                         required={isRequired}

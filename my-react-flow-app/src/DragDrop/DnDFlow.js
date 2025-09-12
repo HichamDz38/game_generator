@@ -40,6 +40,18 @@ const initialNodes = [
 
 let idnumber = 2; 
 
+const generateUniqueNodeId = (existingNodes = []) => {
+  const usedIds = new Set(existingNodes.map(node => node.id));
+  let newId;
+  let counter = 1;
+  
+  do {
+    newId = `N${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${counter++}`;
+  } while (usedIds.has(newId));
+  
+  return newId;
+};
+
 const getId = (existingNodes = []) => {
   let newId;
   let isUnique = false;
@@ -97,7 +109,6 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   }, [isEditable, onEdgesChange]);
 
 
-  //disable keys (clavier)
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (!isEditable && (event.key === 'Delete' || event.key === 'Backspace')) {
@@ -211,10 +222,10 @@ const isPausedRef = useRef(false);
         await executeVirtualNode(node);
         break;
       case 'delay':
-        await executeDelayNode(node);
+        await executeDelayNode(node, pathId);
         break;
       case 'condition':
-        await executeConditionNode(node);
+        await executeConditionNode(node, pathId);
         break;
       case 'input':
       case 'output':
@@ -225,16 +236,22 @@ const isPausedRef = useRef(false);
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(resolve => setTimeout(resolve, 50));
     
     updateExecutionState(prev => {
-      const newCompletedNodes = [...prev.completedNodes, node.id];
+      const newCompletedNodes = [...prev.completedNodes];
+      if (!newCompletedNodes.includes(node.id)) {
+        newCompletedNodes.push(node.id);
+      }
+      
       const newCurrentNodes = prev.currentNodes.filter(id => id !== node.id);
       
-      completionStateRef.current = {
+      const newState = {
         completedNodes: newCompletedNodes,
         failedNodes: prev.failedNodes
       };
+      
+      completionStateRef.current = newState;
       
       console.log(`[${pathId}] Node ${node.data.label} marked as completed. Total completed: ${newCompletedNodes.length}`);
       
@@ -266,13 +283,19 @@ const isPausedRef = useRef(false);
     console.error(`[${pathId}] Error executing node ${node.id}:`, error);
     
     updateExecutionState(prev => {
-      const newFailedNodes = [...prev.failedNodes, node.id];
+      const newFailedNodes = [...prev.failedNodes];
+      if (!newFailedNodes.includes(node.id)) {
+        newFailedNodes.push(node.id);
+      }
+      
       const newCurrentNodes = prev.currentNodes.filter(id => id !== node.id);
       
-      completionStateRef.current = {
+      const newState = {
         completedNodes: prev.completedNodes,
         failedNodes: newFailedNodes
       };
+      
+      completionStateRef.current = newState;
       
       return {
         ...prev,
@@ -442,38 +465,39 @@ const isPausedRef = useRef(false);
     await new Promise(resolve => setTimeout(resolve, parseInt(speed)));
   };
 
-  const executeDelayNode = async (node) => {
+  const executeDelayNode = async (node, pathId = null) => {
   const delaySeconds = node.data.config?.delaySeconds?.value || node.data.delaySeconds || 3;
-  console.log(`Timer node ${node.data.label} starting ${delaySeconds} second delay`);
+  console.log(`[${pathId}] Timer node ${node.data.label} starting ${delaySeconds} second delay`);
   
   const delayMs = parseInt(delaySeconds) * 1000;
+  const startTime = Date.now();
   
   return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-    
-    const checkExecution = () => {
+    const checkInterval = () => {
       if (!isRunningRef.current) {
+        console.log(`[${pathId}] Timer ${node.data.label} stopped by user`);
         reject(new Error('Execution was stopped by user'));
         return;
       }
       
       if (isPausedRef.current) {
-        setTimeout(checkExecution, 100);
+        setTimeout(checkInterval, 100);
         return;
       }
       
       const elapsed = Date.now() - startTime;
       if (elapsed >= delayMs) {
-        console.log(`Timer node ${node.data.label} completed after ${delaySeconds} seconds`);
+        console.log(`[${pathId}] Timer node ${node.data.label} completed after ${delaySeconds} seconds`);
         resolve();
       } else {
-        setTimeout(checkExecution, 100);
+        setTimeout(checkInterval, 50); 
       }
     };
     
-    checkExecution();
+    checkInterval();
   });
 };
+
 
 
   const getNextNodes = useCallback((currentNodeId) => {
@@ -483,6 +507,7 @@ const isPausedRef = useRef(false);
 
 const checkForFlowCompletion = useCallback(() => {
   const conditionNodes = nodes.filter(node => node.data.deviceType === 'condition');
+  const outputNodes = nodes.filter(node => node.type === 'output');
   
   if (conditionNodes.length === 0) {
     console.log('No condition nodes found - waiting for ALL nodes to complete');
@@ -512,33 +537,141 @@ const checkForFlowCompletion = useCallback(() => {
     return allNodesCompleted;
   }
   
-  console.log('Condition nodes found - checking condition logic');
+  console.log('Condition nodes found - checking condition-based completion');
   
-  const allConditionNodesCompleted = conditionNodes.every(conditionNode => 
-    executionState.completedNodes.includes(conditionNode.id)
-  );
-  
-  if (!allConditionNodesCompleted) {
-    const incompleteConditions = conditionNodes.filter(cond => 
-      !executionState.completedNodes.includes(cond.id)
-    );
-    console.log('Waiting for condition nodes to complete:', incompleteConditions.map(c => c.data.label));
-    return false;
-  }
-  
-  const outputNodes = nodes.filter(node => node.type === 'output');
-  const allOutputsCompleted = outputNodes.every(outputNode => 
+  const anyOutputCompleted = outputNodes.some(outputNode => 
     executionState.completedNodes.includes(outputNode.id)
   );
   
-  if (allOutputsCompleted) {
-    console.log('All condition nodes and output nodes completed - flow can finish');
+  if (anyOutputCompleted) {
+    console.log('Output node reached - flow can complete');
     return true;
   }
   
-  console.log('Condition nodes completed but output nodes not completed yet');
+  const allConditionNodesResolved = conditionNodes.every(conditionNode => 
+    executionState.completedNodes.includes(conditionNode.id) || 
+    executionState.failedNodes.includes(conditionNode.id)
+  );
+  
+  if (!allConditionNodesResolved) {
+    console.log('Not all condition nodes have resolved yet');
+    return false;
+  }
+  
+  const canFlowComplete = canFlowCompleteBasedOnConditions(
+    conditionNodes, 
+    executionState.completedNodes, 
+    executionState.failedNodes,
+    nodes,
+    edges
+  );
+  
+  console.log('Flow completion based on conditions:', canFlowComplete);
+  return canFlowComplete;
+}, [nodes, edges, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes]);
+
+const canReachOutputFromStart = useCallback((
+  outputNodeId, 
+  conditionNodes, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const startNode = allNodes.find(node => node.type === 'input');
+  if (!startNode) return false;
+  
+  const visited = new Set();
+  const queue = [startNode.id];
+  
+  while (queue.length > 0) {
+    const currentNodeId = queue.shift();
+    
+    if (visited.has(currentNodeId)) continue;
+    visited.add(currentNodeId);
+    
+    if (currentNodeId === outputNodeId) {
+      return true;
+    }
+    
+    const currentNode = allNodes.find(node => node.id === currentNodeId);
+    
+    if (failedNodes.includes(currentNodeId)) {
+      continue;
+    }
+    
+    if (currentNode.data.deviceType === 'condition') {
+      if (!completedNodes.includes(currentNodeId)) {
+        continue;
+      }
+      
+      const canProceed = checkConditionNodeLogic(currentNode, completedNodes, failedNodes, allNodes, allEdges);
+      if (!canProceed) {
+        continue;
+      }
+    }
+    
+    const nextEdges = allEdges.filter(edge => edge.source === currentNodeId);
+    const nextNodes = nextEdges.map(edge => allNodes.find(node => node.id === edge.target)).filter(Boolean);
+    
+    nextNodes.forEach(nextNode => {
+      if (!visited.has(nextNode.id)) {
+        queue.push(nextNode.id);
+      }
+    });
+  }
+  
   return false;
-}, [nodes, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes]);
+}, []);
+
+const checkConditionNodeLogic = useCallback((
+  conditionNode, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const { config } = conditionNode.data;
+  const logicType = (config.logicType?.value || 'AND').toString().toUpperCase();
+  
+  const connectedSourceIds = allEdges
+    .filter(edge => edge.target === conditionNode.id)
+    .map(edge => edge.source)
+    .filter(sourceId => {
+      const sourceNode = allNodes.find(n => n.id === sourceId);
+      return sourceNode && sourceNode.type !== 'input';
+    });
+  
+  const checkedSources = Object.entries(config)
+    .filter(([key, configItem]) => {
+      return key.startsWith('source_') && 
+             (configItem.value === true || configItem.value === 'true' || configItem.checked === true);
+    })
+    .map(([key, configItem]) => configItem.sourceNodeId)
+    .filter(sourceId => connectedSourceIds.includes(sourceId));
+  
+  const sourcesToMonitor = checkedSources.length === 0 ? connectedSourceIds : checkedSources;
+  
+  if (logicType === 'AND') {
+    return sourcesToMonitor.every(sourceId => completedNodes.includes(sourceId));
+  } else {
+    return sourcesToMonitor.some(sourceId => completedNodes.includes(sourceId));
+  }
+}, []);
+
+const canFlowCompleteBasedOnConditions = useCallback((
+  conditionNodes, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const outputNodes = allNodes.filter(node => node.type === 'output');
+  
+  return outputNodes.some(outputNode => {
+    return canReachOutputFromStart(outputNode.id, conditionNodes, completedNodes, failedNodes, allNodes, allEdges);
+  });
+}, [canReachOutputFromStart]);
 
 const stopAllActiveExecutions = useCallback(() => {
   console.log('Stopping all active executions for early completion');
@@ -560,41 +693,77 @@ const stopAllActiveExecutions = useCallback(() => {
 }, [executionState.currentNodes, setNodes]);
 
 
+
 const executeConditionNode = async (node, pathId = null) => {
   const { config } = node.data;
   
-  if (!config || !config.sources) {
-    console.log(`Condition node ${node.data.label} has no sources configured - passing through`);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return;
+  let logicType = (config.logicType?.value || 'AND').toString().toUpperCase();
+  
+  if (!['AND', 'OR'].includes(logicType)) {
+    console.warn(`Invalid logic type "${logicType}", defaulting to AND`);
+    logicType = 'AND';
   }
   
-  const requiredSources = Object.entries(config.sources)
-    .filter(([key, sourceConfig]) => sourceConfig.checked === true)
-    .map(([key, sourceConfig]) => sourceConfig.sourceNodeId);
+  const connectedSourceIds = edges
+    .filter(edge => edge.target === node.id)
+    .map(edge => edge.source)
+    .filter(sourceId => {
+      const sourceNode = nodes.find(n => n.id === sourceId);
+      return sourceNode && sourceNode.type !== 'input'; 
+    });
   
-  console.log(`Condition node ${node.data.label} analysis:`, {
-    allSources: Object.entries(config.sources).map(([key, source]) => ({
-      id: source.sourceNodeId, 
-      checked: source.checked,
-      label: source.label
-    })),
-    requiredSources,
-    requiredCount: requiredSources.length
+  const allConnectedSources = connectedSourceIds.map(sourceId => {
+    const sourceNode = nodes.find(n => n.id === sourceId);
+    return {
+      nodeId: sourceId,
+      label: sourceNode?.data?.label || `Node ${sourceId}`
+    };
   });
   
-  if (requiredSources.length === 0) {
-    console.log('No sources required - condition node passes immediately');
+  const checkedSources = Object.entries(config)
+    .filter(([key, configItem]) => {
+      return key.startsWith('source_') && 
+             (configItem.value === true || configItem.value === 'true' || configItem.checked === true);
+    })
+    .map(([key, configItem]) => ({
+      nodeId: configItem.sourceNodeId,
+      label: configItem.sourceNodeLabel || configItem.label || `Node ${configItem.sourceNodeId}`
+    }))
+    .filter(source => connectedSourceIds.includes(source.nodeId));
+
+  console.log(`[${pathId}] Condition node ${node.data.label} analysis:`, {
+    logicType,
+    allConnectedSources: allConnectedSources.map(s => s.label),
+    checkedSources: checkedSources.map(s => s.label),
+    totalConnected: allConnectedSources.length,
+    totalChecked: checkedSources.length
+  });
+
+  if (allConnectedSources.length === 0) {
+    console.log(`[${pathId}] No sources connected - condition node passes immediately`);
     await new Promise(resolve => setTimeout(resolve, 100));
     return;
   }
+
+  let sourcesToMonitor;
+  let conditionDescription;
   
-  console.log(`Waiting for ${requiredSources.length} required source(s) to complete...`);
-  
+  if (checkedSources.length === 0) {
+    sourcesToMonitor = allConnectedSources;
+    conditionDescription = `all ${allConnectedSources.length} connected sources (none checked)`;
+  } else {
+    sourcesToMonitor = checkedSources;
+    conditionDescription = `${checkedSources.length} checked source(s)`;
+  }
+
+  console.log(`[${pathId}] Condition node using ${logicType} logic - monitoring ${conditionDescription}`);
+  console.log(`[${pathId}] Monitoring sources: ${sourcesToMonitor.map(s => s.label).join(', ')}`);
+
   let attempts = 0;
   const maxAttempts = 6000; 
   const checkInterval = 100;
-  
+  let lastLogTime = 0;
+
   while (attempts < maxAttempts) {
     if (!isRunningRef.current) {
       throw new Error('Execution was stopped by user');
@@ -605,60 +774,88 @@ const executeConditionNode = async (node, pathId = null) => {
       continue;
     }
     
-    const currentCompleted = completionStateRef.current.completedNodes;
-    const currentFailed = completionStateRef.current.failedNodes;
+    const currentCompleted = [...completionStateRef.current.completedNodes];
+    const currentFailed = [...completionStateRef.current.failedNodes];
     
-    const failedSources = requiredSources.filter(sourceId => 
-      currentFailed.includes(sourceId)
+    const completedMonitored = sourcesToMonitor.filter(source => 
+      currentCompleted.includes(source.nodeId)
     );
     
-    if (failedSources.length > 0) {
-      const failedLabels = failedSources.map(id => {
-        const failedNode = nodes.find(n => n.id === id);
-        return failedNode ? failedNode.data.label : id;
-      });
-      throw new Error(`Required source node(s) failed: ${failedLabels.join(', ')}`);
+    const failedMonitored = sourcesToMonitor.filter(source => 
+      currentFailed.includes(source.nodeId)
+    );
+    
+    const pendingMonitored = sourcesToMonitor.filter(source => 
+      !currentCompleted.includes(source.nodeId) && 
+      !currentFailed.includes(source.nodeId)
+    );
+
+    let conditionMet = false;
+    let shouldFail = false;
+    let failureReason = '';
+
+    if (logicType === 'AND') {
+      if (failedMonitored.length > 0) {
+        shouldFail = true;
+        failureReason = `AND condition failed - source(s) failed: ${failedMonitored.map(s => s.label).join(', ')}`;
+      } else if (completedMonitored.length === sourcesToMonitor.length) {
+        conditionMet = true;
+      }
+    } else if (logicType === 'OR') {
+      if (completedMonitored.length > 0) {
+        conditionMet = true;
+      } else if (failedMonitored.length === sourcesToMonitor.length) {
+        shouldFail = true;
+        failureReason = `OR condition failed - all monitored source nodes failed: ${failedMonitored.map(s => s.label).join(', ')}`;
+      }
+    }
+
+    if (shouldFail) {
+      console.error(`[${pathId}] ${failureReason}`);
+      throw new Error(failureReason);
     }
     
-    const completedSources = requiredSources.filter(sourceId => 
-      currentCompleted.includes(sourceId)
-    );
-    
-    const allRequiredSourcesCompleted = completedSources.length === requiredSources.length;
-    
-    if (allRequiredSourcesCompleted) {
-      console.log(`All ${requiredSources.length} required source nodes completed - condition satisfied!`);
+    if (conditionMet) {
+      let successMessage;
+      if (logicType === 'AND') {
+        successMessage = `AND condition satisfied - all ${sourcesToMonitor.length} monitored sources completed`;
+      } else {
+        successMessage = `OR condition satisfied - ${completedMonitored.length} of ${sourcesToMonitor.length} monitored sources completed`;
+      }
+      
+      console.log(`[${pathId}] ${successMessage}!`);
       break;
     }
-    
+
+    const now = Date.now();
+    if (now - lastLogTime > 5000 && attempts > 0) {
+      console.log(`[${pathId}] Condition ${node.data.label} status - ${logicType} logic, monitoring ${sourcesToMonitor.length} source(s):`, {
+        completed: completedMonitored.map(s => s.label),
+        failed: failedMonitored.map(s => s.label),
+        pending: pendingMonitored.map(s => s.label),
+        completedCount: completedMonitored.length,
+        requiredForSuccess: logicType === 'AND' ? sourcesToMonitor.length : 1
+      });
+      lastLogTime = now;
+    }
+
     await new Promise(resolve => setTimeout(resolve, checkInterval));
     attempts++;
-    
-    if (attempts % 50 === 0 && attempts > 0) {
-      const waitingFor = requiredSources.filter(id => !currentCompleted.includes(id));
-      const waitingLabels = waitingFor.map(id => {
-        const waitingNode = nodes.find(n => n.id === id);
-        return waitingNode ? waitingNode.data.label : id;
-      });
-      
-      console.log(`Condition ${node.data.label} waiting: ${completedSources.length}/${requiredSources.length} sources completed`);
-      console.log('Still waiting for:', waitingLabels);
-    }
   }
   
   if (attempts >= maxAttempts) {
-    const incompleteSources = requiredSources.filter(sourceId => 
-      !completionStateRef.current.completedNodes.includes(sourceId)
-    );
-    const incompleteLabels = incompleteSources.map(id => {
-      const incompleteNode = nodes.find(n => n.id === id);
-      return incompleteNode ? incompleteNode.data.label : id;
-    });
+    const pendingLabels = sourcesToMonitor
+      .filter(source => 
+        !completionStateRef.current.completedNodes.includes(source.nodeId) && 
+        !completionStateRef.current.failedNodes.includes(source.nodeId)
+      )
+      .map(s => s.label);
     
-    throw new Error(`Timeout waiting for required source nodes: ${incompleteLabels.join(', ')}`);
+    const timeoutMinutes = (maxAttempts * checkInterval) / 60000;
+    throw new Error(`Condition timeout after ${timeoutMinutes} minutes - still waiting for: ${pendingLabels.join(', ')}`);
   }
   
-  console.log(`Condition node ${node.data.label} satisfied - proceeding to next nodes`);
+  console.log(`[${pathId}] Condition node ${node.data.label} (${logicType}) satisfied - proceeding to next nodes`);
 };
   
 
@@ -965,6 +1162,41 @@ const executeConditionNode = async (node, pathId = null) => {
     }
   }, [isEditable, setEdges]);
 
+  const checkPathExists = (startId, endId, nodes, edges) => {
+    const graph = {};
+    
+    nodes.forEach(node => {
+      graph[node.id] = [];
+    });
+
+    edges.forEach(edge => {
+      if (graph[edge.source]) {
+        graph[edge.source].push(edge.target);
+      }
+    });
+
+    const visited = {};
+    const queue = [startId];
+    visited[startId] = true;
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      
+      if (current === endId) {
+        return true;
+      }
+
+      for (const neighbor of graph[current] || []) {
+        if (!visited[neighbor]) {
+          visited[neighbor] = true;
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    return false;
+  };
+
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -979,7 +1211,6 @@ const executeConditionNode = async (node, pathId = null) => {
   const config = JSON.parse(event.dataTransfer.getData('application/config') || '{}');
   const deviceDataStr = event.dataTransfer.getData('application/deviceData');
   const deviceData = deviceDataStr ? JSON.parse(deviceDataStr) : null;
-  const uniqueId = event.dataTransfer.getData('application/uniqueId');
   const deviceId = event.dataTransfer.getData('application/deviceId');
 
   if (typeof type === 'undefined' || !type) return;
@@ -989,10 +1220,21 @@ const executeConditionNode = async (node, pathId = null) => {
     y: event.clientY,
   });
   
-  const newNodeId = getId(nodes); 
+  const newNodeId = generateUniqueNodeId(nodes);
+
+  let processedConfig = { ...config };
+  if (type === 'condition' && config.logicType) {
+    processedConfig = {
+      ...config,
+      logicType: {
+        ...config.logicType,
+        value: config.logicType.value || 'AND' 
+      }
+    };
+  }
 
   const newNode = {
-    id: newNodeId, 
+    id: newNodeId,
     type: 'default',
     position,
     data: { 
@@ -1000,96 +1242,162 @@ const executeConditionNode = async (node, pathId = null) => {
       deviceType: type === 'device' ? 
         (deviceData?.node_type || 'device') : 
         type,
-      config: config,
-      uniqueId: uniqueId, 
+      config: processedConfig, 
       originalDeviceId: deviceId,
       deviceData: deviceData
     },
   };
 
   setNodes((nds) => nds.concat(newNode));
-}, [rfInstance, isEditable, setNodes, nodes]); 
+}, [rfInstance, isEditable, setNodes, nodes]);
 
+
+const detectLoops = (nodes, edges) => {
+  const graph = {};
+  const visited = {};
+  const recursionStack = {};
+  const loops = [];
+
+  nodes.forEach(node => {
+    graph[node.id] = [];
+  });
+
+  edges.forEach(edge => {
+    if (graph[edge.source]) {
+      graph[edge.source].push(edge.target);
+    }
+  });
+
+  const dfs = (nodeId, path) => {
+    if (recursionStack[nodeId]) {
+      const loopStartIndex = path.indexOf(nodeId);
+      if (loopStartIndex !== -1) {
+        const loopPath = path.slice(loopStartIndex);
+        loops.push([...loopPath, nodeId]);
+      }
+      return;
+    }
+
+    if (visited[nodeId]) {
+      return;
+    }
+
+    visited[nodeId] = true;
+    recursionStack[nodeId] = true;
+    path.push(nodeId);
+
+    for (const neighbor of graph[nodeId] || []) {
+      dfs(neighbor, path);
+    }
+
+    path.pop();
+    recursionStack[nodeId] = false;
+  };
+
+  Object.keys(graph).forEach(nodeId => {
+    visited[nodeId] = false;
+    recursionStack[nodeId] = false;
+  });
+
+  Object.keys(graph).forEach(nodeId => {
+    if (!visited[nodeId]) {
+      dfs(nodeId, []);
+    }
+  });
+
+  return loops;
+};
+
+const hasLoops = (nodes, edges) => {
+  return detectLoops(nodes, edges).length > 0;
+};
 
   const validateFlow = () => {
-    const errors = [];
-    if (nodes.length === 0) {
-      errors.push("Flow must contain at least one node");
-      return { isValid: false, errors };
+  const errors = [];
+  
+  if (nodes.length === 0) {
+    errors.push("Flow must contain at least one node");
+    return { isValid: false, errors };
+  }
+  
+  const inputNodes = nodes.filter(node => node.type === 'input');
+  const outputNodes = nodes.filter(node => node.type === 'output');
+  
+  if (inputNodes.length === 0 || inputNodes.length > 1) {
+    errors.push("Flow must have exactly one input node");
+  }
+  if (outputNodes.length === 0 || outputNodes.length > 1) {
+    errors.push("Flow must have exactly one output node");
+  }
+  
+  const detectedLoops = detectLoops(nodes, edges);
+  if (detectedLoops.length > 0) {
+    errors.push("Circular dependency detected:");
+  }
+  
+  outputNodes.forEach(outputNode => {
+    const incomingEdgeCount = edges.filter(edge => edge.target === outputNode.id).length;
+    if (incomingEdgeCount !== 1) {
+      errors.push(`Output node must have exactly one incoming edge (currently has ${incomingEdgeCount})`);
     }
-    
-    const inputNodes = nodes.filter(node => node.type === 'input');
-    const outputNodes = nodes.filter(node => node.type === 'output');
-    
-    if (inputNodes.length === 0 || inputNodes.length > 1) {
-      errors.push("Flow must have one input node");
+  });
+  
+  inputNodes.forEach(inputNode => {
+    const hasOutgoingEdge = edges.some(edge => edge.source === inputNode.id);
+    if (!hasOutgoingEdge) {
+      errors.push(`Input node should have at least one outgoing edge`);
     }
-    if (outputNodes.length === 0 || outputNodes.length > 1) {
-      errors.push("Flow must have one output node");
-    }
-    
-    outputNodes.forEach(outputNode => {
-      const incomingEdgeCount = edges.filter(edge => edge.target === outputNode.id).length;
-      if (incomingEdgeCount !== 1) {
-        errors.push(`Output node must have exactly one incoming edge (currently has ${incomingEdgeCount})`);
-      }
-    });
-    inputNodes.forEach(inputNode => {
-      const hasOutgoingEdge = edges.some(edge => edge.source === inputNode.id);
-      if (!hasOutgoingEdge) {
-        errors.push(`Input node should have at least one outgoing Edge`);
-      }
-    });
+  });
 
-    const connectedNodeIds = new Set();
-    edges.forEach(edge => {
-      connectedNodeIds.add(edge.source);
-      connectedNodeIds.add(edge.target);
-    });
-    
-    const isolatedNodes = nodes.filter(node => 
-      !connectedNodeIds.has(node.id) && 
-      node.type !== 'input' && 
-      node.type !== 'output'
-    );
+  const connectedNodeIds = new Set();
+  edges.forEach(edge => {
+    connectedNodeIds.add(edge.source);
+    connectedNodeIds.add(edge.target);
+  });
+  
+  const isolatedNodes = nodes.filter(node => 
+    !connectedNodeIds.has(node.id) && 
+    node.type !== 'input' && 
+    node.type !== 'output'
+  );
 
-    const NormalNodes = nodes.filter(node => 
-      connectedNodeIds.has(node.id) && 
-      node.type !== 'input' && 
-      node.type !== 'output'
-    )
+  if (isolatedNodes.length > 0) {
+    const isolatedLabels = isolatedNodes.map(node => 
+      node.data.label || node.id
+    ).join(', ');
+    errors.push(`Isolated nodes found: ${isolatedLabels}`);
+  }
+  
+  const normalNodes = nodes.filter(node => 
+    connectedNodeIds.has(node.id) && 
+    node.type !== 'input' && 
+    node.type !== 'output'
+  );
 
-    NormalNodes.forEach(NormalNodes => {
-      const hasIncomingEdge = edges.some(edge => edge.target === NormalNodes.id);
-      const hasOutgoingEdge = edges.some(edge => edge.source === NormalNodes.id);
-      if (!hasIncomingEdge || !hasOutgoingEdge) {
-        errors.push(`each node must have at least one incoming edge and one outgoing edge`);
-        return ;
-      }
-    });
+  normalNodes.forEach(node => {
+    const hasIncomingEdge = edges.some(edge => edge.target === node.id);
+    const hasOutgoingEdge = edges.some(edge => edge.source === node.id);
     
-    if (isolatedNodes.length > 0) {
-      errors.push(`Found a node with no edeges`);
+    if (!hasIncomingEdge) {
+      errors.push(`Node "${node.data.label || node.id}" has no incoming edges`);
     }
-    
-    if (inputNodes.length > 0 && outputNodes.length> 0) {
-      const hasValidPath = outputNodes.some(outputNode => {
-        const reachableFromInput = edges.some(edge => 
-          edge.target === outputNode.id || 
-          inputNodes.some(inputNode => edge.source === inputNode.id)
-        );
-        return reachableFromInput;
-      });
-      
-      if (!hasValidPath && edges.length > 0) {
-        errors.push("must have path from input to output nodes");
-      }
+    if (!hasOutgoingEdge) {
+      errors.push(`Node "${node.data.label || node.id}" has no outgoing edges`);
     }
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+  });
+  
+  if (inputNodes.length > 0 && outputNodes.length > 0) {
+    const hasValidPath = checkPathExists(inputNodes[0].id, outputNodes[0].id, nodes, edges);
+    if (!hasValidPath) {
+      errors.push("No valid path exists from input to output node");
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
   };
+};
 
   const saveFlowToBackend = async () => {
     const validation = validateFlow();
@@ -1212,13 +1520,9 @@ useEffect(() => {
     const shouldComplete = checkForFlowCompletion();
     
     if (shouldComplete) {
-      console.log('AUTOMATIC FLOW COMPLETION DETECTED - Stopping execution');
+      console.log('FLOW COMPLETION DETECTED - Stopping execution');
       
-      const hasConditionNodes = nodes.some(node => node.data.deviceType === 'condition');
-      
-      if (hasConditionNodes) {
-        stopAllActiveExecutions();
-      }
+      stopAllActiveExecutions();
       
       setNodes(nds => nds.map(n => ({
         ...n,
@@ -1229,13 +1533,13 @@ useEffect(() => {
         ...prev,
         isRunning: false,
         shouldStop: true,
-        shouldCompleteEarly: false, 
-        currentNodes: hasConditionNodes ? [] : prev.currentNodes,
-        activePaths: hasConditionNodes ? new Set() : prev.activePaths,
-        earlyCompletionReason: hasConditionNodes ? 'Condition-based completion' : 'Full flow completion',
+        shouldCompleteEarly: false,
+        currentNodes: [],
+        activePaths: new Set(),
+        earlyCompletionReason: 'Condition-based flow completion',
         executionLog: [...prev.executionLog, {
           type: 'success',
-          message: `Flow execution completed successfully (${hasConditionNodes ? 'Condition-based' : 'Full flow'})`,
+          message: 'Flow execution completed successfully based on condition outcomes',
           timestamp: new Date(),
           duration: new Date() - prev.startTime
         }]
@@ -1245,7 +1549,7 @@ useEffect(() => {
       isRunningRef.current = false;
       
       setTimeout(() => {
-        alert(`Flow execution completed successfully! ${hasConditionNodes ? 'Condition requirements satisfied.' : 'All devices completed.'}`);
+        alert('Flow execution completed successfully based on condition outcomes!');
       }, 300);
     }
   }
