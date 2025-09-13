@@ -505,6 +505,109 @@ const isPausedRef = useRef(false);
   return nextEdges.map(edge => nodes.find(node => node.id === edge.target)).filter(Boolean);
 }, [edges, nodes]);
 
+const checkConditionNodeLogic = useCallback((
+  conditionNode, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const { config } = conditionNode.data;
+  const logicType = (config.logicType?.value || 'AND').toString().toUpperCase();
+  
+  const connectedSourceIds = allEdges
+    .filter(edge => edge.target === conditionNode.id)
+    .map(edge => edge.source)
+    .filter(sourceId => {
+      const sourceNode = allNodes.find(n => n.id === sourceId);
+      return sourceNode && sourceNode.type !== 'input';
+    });
+  
+  const checkedSources = Object.entries(config)
+    .filter(([key, configItem]) => {
+      return key.startsWith('source_') && 
+             (configItem.value === true || configItem.value === 'true' || configItem.checked === true);
+    })
+    .map(([key, configItem]) => configItem.sourceNodeId)
+    .filter(sourceId => connectedSourceIds.includes(sourceId));
+  
+  const sourcesToMonitor = checkedSources.length === 0 ? connectedSourceIds : checkedSources;
+  
+  if (logicType === 'AND') {
+    return sourcesToMonitor.every(sourceId => completedNodes.includes(sourceId));
+  } else {
+    return sourcesToMonitor.some(sourceId => completedNodes.includes(sourceId));
+  }
+}, []);
+
+const canReachOutputFromStart = useCallback((
+  outputNodeId, 
+  conditionNodes, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const startNode = allNodes.find(node => node.type === 'input');
+  if (!startNode) return false;
+  
+  const visited = new Set();
+  const queue = [startNode.id];
+  
+  while (queue.length > 0) {
+    const currentNodeId = queue.shift();
+    
+    if (visited.has(currentNodeId)) continue;
+    visited.add(currentNodeId);
+    
+    if (currentNodeId === outputNodeId) {
+      return true;
+    }
+    
+    const currentNode = allNodes.find(node => node.id === currentNodeId);
+    
+    if (failedNodes.includes(currentNodeId)) {
+      continue;
+    }
+    
+    if (currentNode.data.deviceType === 'condition') {
+      if (!completedNodes.includes(currentNodeId)) {
+        continue;
+      }
+      
+      const canProceed = checkConditionNodeLogic(currentNode, completedNodes, failedNodes, allNodes, allEdges);
+      if (!canProceed) {
+        continue;
+      }
+    }
+    
+    const nextEdges = allEdges.filter(edge => edge.source === currentNodeId);
+    const nextNodes = nextEdges.map(edge => allNodes.find(node => node.id === edge.target)).filter(Boolean);
+    
+    nextNodes.forEach(nextNode => {
+      if (!visited.has(nextNode.id)) {
+        queue.push(nextNode.id);
+      }
+    });
+  }
+  
+  return false;
+}, [checkConditionNodeLogic]);
+
+const canFlowCompleteBasedOnConditions = useCallback((
+  conditionNodes, 
+  completedNodes, 
+  failedNodes,
+  allNodes,
+  allEdges
+) => {
+  const outputNodes = allNodes.filter(node => node.type === 'output');
+  
+  return outputNodes.some(outputNode => {
+    return canReachOutputFromStart(outputNode.id, conditionNodes, completedNodes, failedNodes, allNodes, allEdges);
+  });
+}, [canReachOutputFromStart]);
+
 const checkForFlowCompletion = useCallback(() => {
   const conditionNodes = nodes.filter(node => node.data.deviceType === 'condition');
   const outputNodes = nodes.filter(node => node.type === 'output');
@@ -568,110 +671,12 @@ const checkForFlowCompletion = useCallback(() => {
   
   console.log('Flow completion based on conditions:', canFlowComplete);
   return canFlowComplete;
-}, [nodes, edges, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes]);
+}, [nodes, edges, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes,canFlowCompleteBasedOnConditions]);
 
-const canReachOutputFromStart = useCallback((
-  outputNodeId, 
-  conditionNodes, 
-  completedNodes, 
-  failedNodes,
-  allNodes,
-  allEdges
-) => {
-  const startNode = allNodes.find(node => node.type === 'input');
-  if (!startNode) return false;
-  
-  const visited = new Set();
-  const queue = [startNode.id];
-  
-  while (queue.length > 0) {
-    const currentNodeId = queue.shift();
-    
-    if (visited.has(currentNodeId)) continue;
-    visited.add(currentNodeId);
-    
-    if (currentNodeId === outputNodeId) {
-      return true;
-    }
-    
-    const currentNode = allNodes.find(node => node.id === currentNodeId);
-    
-    if (failedNodes.includes(currentNodeId)) {
-      continue;
-    }
-    
-    if (currentNode.data.deviceType === 'condition') {
-      if (!completedNodes.includes(currentNodeId)) {
-        continue;
-      }
-      
-      const canProceed = checkConditionNodeLogic(currentNode, completedNodes, failedNodes, allNodes, allEdges);
-      if (!canProceed) {
-        continue;
-      }
-    }
-    
-    const nextEdges = allEdges.filter(edge => edge.source === currentNodeId);
-    const nextNodes = nextEdges.map(edge => allNodes.find(node => node.id === edge.target)).filter(Boolean);
-    
-    nextNodes.forEach(nextNode => {
-      if (!visited.has(nextNode.id)) {
-        queue.push(nextNode.id);
-      }
-    });
-  }
-  
-  return false;
-}, []);
 
-const checkConditionNodeLogic = useCallback((
-  conditionNode, 
-  completedNodes, 
-  failedNodes,
-  allNodes,
-  allEdges
-) => {
-  const { config } = conditionNode.data;
-  const logicType = (config.logicType?.value || 'AND').toString().toUpperCase();
-  
-  const connectedSourceIds = allEdges
-    .filter(edge => edge.target === conditionNode.id)
-    .map(edge => edge.source)
-    .filter(sourceId => {
-      const sourceNode = allNodes.find(n => n.id === sourceId);
-      return sourceNode && sourceNode.type !== 'input';
-    });
-  
-  const checkedSources = Object.entries(config)
-    .filter(([key, configItem]) => {
-      return key.startsWith('source_') && 
-             (configItem.value === true || configItem.value === 'true' || configItem.checked === true);
-    })
-    .map(([key, configItem]) => configItem.sourceNodeId)
-    .filter(sourceId => connectedSourceIds.includes(sourceId));
-  
-  const sourcesToMonitor = checkedSources.length === 0 ? connectedSourceIds : checkedSources;
-  
-  if (logicType === 'AND') {
-    return sourcesToMonitor.every(sourceId => completedNodes.includes(sourceId));
-  } else {
-    return sourcesToMonitor.some(sourceId => completedNodes.includes(sourceId));
-  }
-}, []);
 
-const canFlowCompleteBasedOnConditions = useCallback((
-  conditionNodes, 
-  completedNodes, 
-  failedNodes,
-  allNodes,
-  allEdges
-) => {
-  const outputNodes = allNodes.filter(node => node.type === 'output');
-  
-  return outputNodes.some(outputNode => {
-    return canReachOutputFromStart(outputNode.id, conditionNodes, completedNodes, failedNodes, allNodes, allEdges);
-  });
-}, [canReachOutputFromStart]);
+
+
 
 const stopAllActiveExecutions = useCallback(() => {
   console.log('Stopping all active executions for early completion');
@@ -1308,9 +1313,6 @@ const detectLoops = (nodes, edges) => {
   return loops;
 };
 
-const hasLoops = (nodes, edges) => {
-  return detectLoops(nodes, edges).length > 0;
-};
 
   const validateFlow = () => {
   const errors = [];

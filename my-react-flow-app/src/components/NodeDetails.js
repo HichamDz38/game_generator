@@ -74,7 +74,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
       setConfigValues(newConfigValues);
     }
   }
-}, [nodeData, nodes, edges]);
+}, [nodeData, nodes, edges, configValues]);
 
   const handleInputChange = (fieldName, value) => {
   setConfigValues(prev => ({
