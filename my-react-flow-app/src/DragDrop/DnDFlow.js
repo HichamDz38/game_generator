@@ -1155,7 +1155,6 @@ const executeConditionNode = async (node, pathId = null) => {
   }
 };
 
-
   const updateNodeData = (nodeId, newData) => {
     setNodes((nds) =>
       nds.map((node) =>
