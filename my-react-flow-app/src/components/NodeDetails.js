@@ -11,16 +11,22 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   const [connectedSources, setConnectedSources] = useState([]);
   const [configValues, setConfigValues] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
+  const [conditionalFields, setConditionalFields] = useState({});
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {
       const previews = {};
       const values = {};
+      const conditionals = {};
       
       Object.keys(nodeData.data.config).forEach(key => {
         const config = nodeData.data.config[key];
         
         values[key] = config.value !== undefined ? config.value : '';
+        
+        if (config.conditional) {
+          conditionals[key] = config.conditional;
+        }
         
         if (config.type === 'file' && config.value) {
           if (config.value.startsWith('data:image/')) {
@@ -36,112 +42,127 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
       
       setImagePreviews(previews);
       setConfigValues(values);
+      setConditionalFields(conditionals);
       setValidationErrors({});
     }
 
     if (nodeData && nodeData.data?.deviceType === 'condition') {
-    const sourceNodeIds = edges
-      .filter(edge => edge.target === nodeData.id)
-      .map(edge => edge.source);
-    
-    const sourceNodes = nodes.filter(node => 
-      sourceNodeIds.includes(node.id) && 
-      node.type !== 'input'
-    );
-    
-    setConnectedSources(sourceNodes);
+      const sourceNodeIds = edges
+        .filter(edge => edge.target === nodeData.id)
+        .map(edge => edge.source);
+      
+      const sourceNodes = nodes.filter(node => 
+        sourceNodeIds.includes(node.id) && 
+        node.type !== 'input'
+      );
+      
+      setConnectedSources(sourceNodes);
 
       if (nodeData.data.config) {
-      const newConfigValues = { ...configValues };
-      const newConfig = { ...nodeData.data.config };
-      
-      sourceNodes.forEach(sourceNode => {
-        const checkboxKey = `source_${sourceNode.id}`;
+        const newConfigValues = { ...configValues };
+        const newConfig = { ...nodeData.data.config };
         
-        if (!newConfig[checkboxKey]) {
-          newConfig[checkboxKey] = {
-            type: 'checkbox',
-            value: false,
-            sourceNodeId: sourceNode.id,
-            sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
-          };
-        }
+        sourceNodes.forEach(sourceNode => {
+          const checkboxKey = `source_${sourceNode.id}`;
+          
+          if (!newConfig[checkboxKey]) {
+            newConfig[checkboxKey] = {
+              type: 'checkbox',
+              value: false,
+              sourceNodeId: sourceNode.id,
+              sourceNodeLabel: sourceNode.data?.label || `Node ${sourceNode.id}`
+            };
+          }
+          
+          newConfigValues[checkboxKey] = newConfig[checkboxKey]?.value || false;
+        });
         
-        newConfigValues[checkboxKey] = newConfig[checkboxKey]?.value || false;
-      });
-      
-      nodeData.data.config = newConfig;
-      setConfigValues(newConfigValues);
+        nodeData.data.config = newConfig;
+        setConfigValues(newConfigValues);
+      }
     }
-  }
-}, [nodeData, nodes, edges, configValues]);
+  }, [nodeData, nodes, edges, configValues]);
+
+  const shouldDisplayField = (fieldName) => {
+    const condition = conditionalFields[fieldName];
+    if (!condition) return true; 
+    
+    const { dependsOn, values } = condition;
+    const dependentValue = configValues[dependsOn];
+    
+    return values.includes(dependentValue);
+  };
+
+  const isFieldRequired = (fieldName, config) => {
+    const condition = conditionalFields[fieldName];
+    if (!condition) return config.required || false;
+    
+    const { dependsOn, values } = condition;
+    const dependentValue = configValues[dependsOn];
+    
+    return values.includes(dependentValue) && (config.required || false);
+  };
 
   const handleInputChange = (fieldName, value) => {
-  setConfigValues(prev => ({
-    ...prev,
-    [fieldName]: value
-  }));
-  
-  if (nodeData.data.config[fieldName]) {
-    if (fieldName === 'logicType') {
-      nodeData.data.config[fieldName].value = value;
-      console.log(`Logic type set to: ${value}`);
-    } else {
-      nodeData.data.config[fieldName].value = value;
+    setConfigValues(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+    
+    if (nodeData.data.config[fieldName]) {
+      if (fieldName === 'logicType') {
+        nodeData.data.config[fieldName].value = value;
+        console.log(`Logic type set to: ${value}`);
+      } else {
+        nodeData.data.config[fieldName].value = value;
+      }
     }
-  }
 
-  if (validationErrors[fieldName]) {
-    setValidationErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[fieldName];
-      return newErrors;
-    });
-  }
-};
+    if (validationErrors[fieldName]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
 
   const validateRequiredFields = () => {
-  const errors = {};
-  let isValid = true;
+    const errors = {};
+    let isValid = true;
 
-  Object.keys(nodeData.data.config).forEach((item) => {
-    const config = nodeData.data.config[item];
-    
-    if (item.startsWith('source_')) {
-      return;
-    }
-
-    if (item === 'logicType' && config.required) {
-      const value = configValues[item] || config.value;
-      if (!value || !['AND', 'OR'].includes(String(value).toUpperCase())) {
-        errors[item] = 'Logic type must be AND or OR';
-        isValid = false;
+    Object.keys(nodeData.data.config).forEach((item) => {
+      const config = nodeData.data.config[item];
+      
+      if (item.startsWith('source_') || !shouldDisplayField(item)) {
+        return;
       }
-    }
-    
-    if (config.required) {
-      if (config.type === 'file') {
-        if (!config.value && !config.tempDataUrl) {
-          errors[item] = 'This field is required';
-          isValid = false;
-        }
-      } else if (config.type === 'checkbox') {
-        if (configValues[item] === undefined || configValues[item] === null) {
-          errors[item] = 'This field is required';
-          isValid = false;
-        }
-      } else {
-        if (!configValues[item] && configValues[item] !== 0 && configValues[item] !== false) {
-          errors[item] = 'This field is required';
-          isValid = false;
+
+      const fieldRequired = isFieldRequired(item, config);
+
+      if (fieldRequired) {
+        if (config.type === 'file') {
+          if (!config.value && !config.tempDataUrl) {
+            errors[item] = 'This field is required';
+            isValid = false;
+          }
+        } else if (config.type === 'checkbox') {
+          if (configValues[item] === undefined || configValues[item] === null) {
+            errors[item] = 'This field is required';
+            isValid = false;
+          }
+        } else {
+          if (!configValues[item] && configValues[item] !== 0 && configValues[item] !== false) {
+            errors[item] = 'This field is required';
+            isValid = false;
+          }
         }
       }
-    }
-  });
+    });
 
-  setValidationErrors(errors);
-  return isValid;
-};
+    setValidationErrors(errors);
+    return isValid;
+  };
 
   if (!nodeData) return null;
 
@@ -325,15 +346,15 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
           </div>
         )}
 
-
         <div className={styles.nodeDetailsConfig}>
           {Object.keys(nodeData.data.config).map((item) => {
             const value = nodeData.data.config[item];
-            if (item.startsWith('source_')) {
+            
+            if (item.startsWith('source_') || !shouldDisplayField(item)) {
               return null;
             }
 
-            const isRequired = value.required || false;
+            const isRequired = isFieldRequired(item, value);
             const hasError = validationErrors[item];
 
             return (

@@ -256,10 +256,27 @@ def save_random_device_config():
                     'type' : 'number',
                     'required': True
                 },
-                "direction":{
-                    'type' : 'select',
-                    'options': ["LEFT", "RIGHT"],
-                    'required': True
+                "direction": {
+                'type': 'select',
+                'options': ["LEFT", "RIGHT"],
+                'required': True
+                },
+                "right_option": {
+                    'type': 'text',
+                    'required': True,
+                    'conditional': {
+                        'dependsOn': 'direction',
+                        'values': ['RIGHT']
+                    }
+                },
+                "left_option": {
+                    'type': 'file',
+                    'accept': 'image/*',
+                    'required': True,
+                    'conditional': {
+                        'dependsOn': 'direction',
+                        'values': ['LEFT']
+                    }
                 }
             }
         },
