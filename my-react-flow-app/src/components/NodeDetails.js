@@ -12,6 +12,28 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   const [configValues, setConfigValues] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
   const [conditionalFields, setConditionalFields] = useState({});
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  // Close when node is deleted
+  useEffect(() => {
+    if (nodeData && !nodes.some(node => node.id === nodeData.id)) {
+      onClose();
+    }
+  }, [nodes, nodeData, onClose]);
   
   useEffect(() => {
     if (nodeData && nodeData.data && nodeData.data.config) {

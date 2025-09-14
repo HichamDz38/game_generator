@@ -85,21 +85,26 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
 
 
   const customOnNodesChange = useCallback((changes) => {
-    const filteredChanges = changes.filter(change => {
-      if (change.type === 'remove') {
-        const nodeToRemove = nodes.find(node => node.id === change.id);
-        if (nodeToRemove && (nodeToRemove.type === 'input' || nodeToRemove.type === 'output')) {
-          console.log('Cannot delete input or output nodes');
-          return false;
-        }
+  const filteredChanges = changes.filter(change => {
+    if (change.type === 'remove') {
+      const nodeToRemove = nodes.find(node => node.id === change.id);
+      
+      if (nodeToRemove && selectedNode && selectedNode.id === change.id) {
+        setSelectedNode(null);
       }
-      return true;
-    });
-    
-    if (filteredChanges.length > 0) {
-      onNodesChange(filteredChanges);
+      
+      if (nodeToRemove && (nodeToRemove.type === 'input' || nodeToRemove.type === 'output')) {
+        console.log('Cannot delete input or output nodes');
+        return false;
+      }
     }
-  }, [nodes, onNodesChange]);
+    return true;
+  });
+  
+  if (filteredChanges.length > 0) {
+    onNodesChange(filteredChanges);
+  }
+}, [nodes, onNodesChange, selectedNode, setSelectedNode]);
 
   const customOnEdgesChange = useCallback((changes) => {
     if (!isEditable) {
@@ -1138,12 +1143,17 @@ const executeConditionNode = async (node, pathId = null) => {
 
 
   const onNodeClick = (e, clickedNode) => {
-    if (clickedNode.data.deviceType === 'delay') {
-      setSelectedNode(clickedNode);
-    } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
-      setSelectedNode(clickedNode);
-    }
-  };
+  if (selectedNode && selectedNode.id === clickedNode.id) {
+    setSelectedNode(null);
+    return;
+  }
+  
+  if (clickedNode.data.deviceType === 'delay') {
+    setSelectedNode(clickedNode);
+  } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
+    setSelectedNode(clickedNode);
+  }
+};
 
 
   const updateNodeData = (nodeId, newData) => {
