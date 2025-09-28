@@ -11,7 +11,6 @@ HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 65432      # Port to listen on
 connected_devices = {}
 backend_url = os.getenv("REACT_APP_API_BASE_URL")
-backend_url = "http://192.168.16.240:5000"
 # Redis client
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
 
