@@ -56,7 +56,7 @@ def handle_client(client_socket, addr):
     print(f"Accepted connection from {addr}")
     try:
         device_info = json.loads(client_socket.recv(1024).decode('utf-8'))
-        num_nodes = device_info.get("num_nodes", 0)
+        num_nodes = device_info.get("num_nodes", 1)
         if num_nodes > 1:
             for i in range(num_nodes):
                 update_device_info(device_id+f"_{i+1}", device_info)
@@ -70,7 +70,7 @@ def handle_client(client_socket, addr):
     while True:
         try:
             if num_nodes > 1:
-                command=get_device_command(device_id, index=index)
+                command=get_device_command(f"{device_id}_{index+1}")
                 index = (index+1) % num_nodes
             else:
                 command=get_device_command(device_id)        
@@ -89,16 +89,19 @@ def handle_client(client_socket, addr):
                 
         except Exception as e:
             print(f"An error occurred: {e}")
-            revove_device(device_id)
+            client_socket.close()
+            if num_nodes > 1:
+                for i in range(num_nodes):
+                    remove_device(f"{device_id}_{index+1}")
+            else:
+                remove_device(device_id)
             break
 
 
-def get_device_command(device_id, index=None):
+def get_device_command(device_id):
     """
     Retrieve the next command for a specific device from Redis.
     """
-    if index is not None:
-        return r.lpop(f"{device_id}_{index+1}:commands")
     return r.lpop(f"{device_id}:commands")
 
 
@@ -111,7 +114,7 @@ def update_device_info(device_id, device_info):
     r.set(name="connected_devices", value=json.dumps(connected_devices))
 
 
-def revove_device(device_id):
+def remove_device(device_id):
     """
     Remove the device from the connected_devices dictionary and Redis.
     """
@@ -131,4 +134,3 @@ if __name__ == "__main__":
         connected_devices = {}
         r.set(name="connected_devices", value=str(connected_devices))
         print("Server stopped.")
-
