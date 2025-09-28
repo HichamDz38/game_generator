@@ -56,14 +56,25 @@ def handle_client(client_socket, addr):
     print(f"Accepted connection from {addr}")
     try:
         device_info = json.loads(client_socket.recv(1024).decode('utf-8'))
-        update_device_info(device_id, device_info)
+        num_nodes = device_info.get("num_nodes", 0)
+        if num_nodes > 1:
+            for i in range(num_nodes):
+                update_device_info(device_id+f"_{i+1}", device_info)
+        else:
+            update_device_info(device_id, device_info)
     except Exception as e:
         print(f"[!] Error receiving initial device info: {e}")
         return
 
+    index = 0
     while True:
         try:
-            if command:=get_device_command(device_id):
+            if num_nodes > 1:
+                command=get_device_command(device_id, index=index)
+                index = (index+1) % num_nodes
+            else:
+                command=get_device_command(device_id)        
+            if command:
                 print(f"Got command {command}")
                 command_data= json.loads(command)
                 node_id = command_data["node_id"]
@@ -82,10 +93,12 @@ def handle_client(client_socket, addr):
             break
 
 
-def get_device_command(device_id):
+def get_device_command(device_id, index=None):
     """
     Retrieve the next command for a specific device from Redis.
     """
+    if index is not None:
+        return r.lpop(f"{device_id}_{index+1}:commands")
     return r.lpop(f"{device_id}:commands")
 
 
