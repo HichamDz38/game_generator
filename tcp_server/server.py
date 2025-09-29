@@ -77,6 +77,7 @@ def handle_client(client_socket, addr):
                 print(f"Got command {command}")
                 command_data= json.loads(command)
                 command_data["index"] = index
+                print(f"Got command {command}")
                 node_id = command_data["node_id"]
                 r.set(f"flow_execution:{node_id}", "started")
                 client_socket.sendall(command.encode("utf-8"))
