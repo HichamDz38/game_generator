@@ -75,8 +75,9 @@ def handle_client(client_socket, addr):
                 command=get_device_command(device_id)        
             if command:
                 print(f"Got command {command}")
-                command_data= json.loads(command)
+                command_data = json.loads(command)
                 command_data["index"] = index
+                command = json.dumps(command_data)
                 print(f"Got command {command}")
                 node_id = command_data["node_id"]
                 r.set(f"flow_execution:{node_id}", "started")
