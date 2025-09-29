@@ -261,22 +261,26 @@ def save_random_device_config():
                 'options': ["LEFT", "RIGHT"],
                 'required': True
                 },
-                "right_option": {
-                    'type': 'text',
-                    'required': True,
-                    'conditional': {
-                        'dependsOn': 'direction',
-                        'values': ['RIGHT']
-                    }
+                "level": {
+                    'type': 'select',
+                    'options': ["UP", "DOWN"],
+                    'required': True
                 },
-                "left_option": {
-                    'type': 'file',
-                    'accept': 'image/*',
-                    'required': True,
-                    'conditional': {
-                        'dependsOn': 'direction',
-                        'values': ['LEFT']
-                    }
+                "display_input_0": {
+                    'type': 'text',
+                    'required': False,
+                    'conditional': [
+                        {'dependsOn': 'direction', 'values': ['LEFT']},
+                        {'dependsOn': 'level', 'values': ['UP']}
+                    ]
+                },
+                "display_input_1": {
+                    'type': 'checkbox',
+                    'required': False,
+                    'conditional': [
+                        {'dependsOn': 'direction', 'values': ['RIGHT']},
+                        {'dependsOn': 'level', 'values': ['DOWN']}
+                    ]
                 }
             }
         },

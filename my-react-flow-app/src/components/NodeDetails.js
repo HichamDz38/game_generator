@@ -47,7 +47,9 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
         values[key] = config.value !== undefined ? config.value : '';
         
         if (config.conditional) {
-          conditionals[key] = config.conditional;
+          conditionals[key] = Array.isArray(config.conditional) 
+            ? config.conditional 
+            : [config.conditional]; 
         }
         
         if (config.type === 'file' && config.value) {
@@ -107,23 +109,30 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
 
   const shouldDisplayField = (fieldName) => {
     const condition = conditionalFields[fieldName];
-    if (!condition) return true; 
+    if (!condition) return true;
     
-    const { dependsOn, values } = condition;
-    const dependentValue = configValues[dependsOn];
-    
-    return values.includes(dependentValue);
+    if (Array.isArray(condition)) {
+      return condition.every(cond => {
+        const { dependsOn, values } = cond;
+        const dependentValue = configValues[dependsOn];
+        return values.includes(dependentValue);
+      });
+    } else {
+      const { dependsOn, values } = condition;
+      const dependentValue = configValues[dependsOn];
+      return values.includes(dependentValue);
+    }
   };
 
   const isFieldRequired = (fieldName, config) => {
     const condition = conditionalFields[fieldName];
     if (!condition) return config.required || false;
     
-    const { dependsOn, values } = condition;
-    const dependentValue = configValues[dependsOn];
+    const shouldDisplay = shouldDisplayField(fieldName);
     
-    return values.includes(dependentValue) && (config.required || false);
+    return shouldDisplay && (config.required || false);
   };
+
 
   const handleInputChange = (fieldName, value) => {
     setConfigValues(prev => ({
@@ -150,41 +159,41 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges }
   };
 
   const validateRequiredFields = () => {
-    const errors = {};
-    let isValid = true;
+  const errors = {};
+  let isValid = true;
 
-    Object.keys(nodeData.data.config).forEach((item) => {
-      const config = nodeData.data.config[item];
-      
-      if (item.startsWith('source_') || !shouldDisplayField(item)) {
-        return;
-      }
+  Object.keys(nodeData.data.config).forEach((item) => {
+    const config = nodeData.data.config[item];
+    
+    if (item.startsWith('source_') || !shouldDisplayField(item)) {
+      return;
+    }
 
-      const fieldRequired = isFieldRequired(item, config);
+    const fieldRequired = isFieldRequired(item, config);
 
-      if (fieldRequired) {
-        if (config.type === 'file') {
-          if (!config.value && !config.tempDataUrl) {
-            errors[item] = 'This field is required';
-            isValid = false;
-          }
-        } else if (config.type === 'checkbox') {
-          if (configValues[item] === undefined || configValues[item] === null) {
-            errors[item] = 'This field is required';
-            isValid = false;
-          }
-        } else {
-          if (!configValues[item] && configValues[item] !== 0 && configValues[item] !== false) {
-            errors[item] = 'This field is required';
-            isValid = false;
-          }
+    if (fieldRequired) {
+      if (config.type === 'file') {
+        if (!config.value && !config.tempDataUrl) {
+          errors[item] = 'This field is required';
+          isValid = false;
+        }
+      } else if (config.type === 'checkbox') {
+        if (configValues[item] === undefined || configValues[item] === null) {
+          errors[item] = 'This field is required';
+          isValid = false;
+        }
+      } else {
+        if (!configValues[item] && configValues[item] !== 0 && configValues[item] !== false) {
+          errors[item] = 'This field is required';
+          isValid = false;
         }
       }
-    });
+    }
+  });
 
-    setValidationErrors(errors);
-    return isValid;
-  };
+  setValidationErrors(errors);
+  return isValid;
+};
 
   if (!nodeData) return null;
 
