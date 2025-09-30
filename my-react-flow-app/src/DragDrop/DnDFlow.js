@@ -647,15 +647,23 @@ const checkForFlowCompletion = useCallback(() => {
   
   console.log('Condition nodes found - checking condition-based completion');
   
-  const anyOutputCompleted = outputNodes.some(outputNode => 
-    executionState.completedNodes.includes(outputNode.id)
-  );
+//   const anyOutputCompleted = outputNodes.some(outputNode => 
+//   executionState.completedNodes.includes(outputNode.id)
+// );
   
-  if (anyOutputCompleted) {
-    console.log('Output node reached - flow can complete');
-    return true;
-  }
+//   if (anyOutputCompleted) {
+//     console.log('Output node reached - flow can complete');
+//   return true;
+// }
   
+const allOutputsCompleted = outputNodes.every(outputNode => 
+  executionState.completedNodes.includes(outputNode.id)
+);
+if (allOutputsCompleted) {
+  console.log("All output nodes reached - flow can complete");
+  return true;
+}
+
   const allConditionNodesResolved = conditionNodes.every(conditionNode => 
     executionState.completedNodes.includes(conditionNode.id) || 
     executionState.failedNodes.includes(conditionNode.id)
@@ -675,7 +683,9 @@ const checkForFlowCompletion = useCallback(() => {
   );
   
   console.log('Flow completion based on conditions:', canFlowComplete);
-  return canFlowComplete;
+  // return canFlowComplete;
+  return canFlowComplete && allOutputsCompleted;
+
 }, [nodes, edges, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes,canFlowCompleteBasedOnConditions]);
 
 
