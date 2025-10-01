@@ -114,7 +114,8 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
                 onDragStart={(event) => onDragStart(
                   event, 
                   'device', 
-                  `${deviceData.device_name}-${deviceId}/${uniqueId}`, 
+                  `${deviceData.device_name}-${uniqueId}`, 
+                  // `${deviceData.device_name}-${deviceId}/${uniqueId}`, 
                   deviceData.config, 
                   deviceData,
                   uniqueId, 
@@ -122,7 +123,8 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
                 )}
                 draggable
               >
-                {deviceData.device_name} - {deviceId}
+                {/* {deviceData.device_name} - {deviceId} */}
+                {deviceData.device_name}
               </div>
             );
           })
