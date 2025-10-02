@@ -217,6 +217,8 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
       }
     });
 
+  
+
     if (onUpdate) onUpdate(nodeData.id, nodeData.data);
     onClose();
   };
@@ -240,13 +242,14 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
   ref={containerRef}
   style={{
      position: 'absolute',
-    top: (position?.y+300),  // offset so it’s not under the cursor
-    left: (position?.x +300),
+    top: (position?.y+10),  // offset so it’s not under the cursor
+    left: (position?.x -10),
     zIndex: 9999
   }}
     >
       <div className={styles.nodeDetailsContent}>
         <p><strong>Name:</strong> {nodeData.data?.label}</p>
+        <p><strong>IP:</strong> {nodeData.data?.originalDeviceId}</p>
         <p><strong>Type:</strong> {nodeData.type}</p>
 
         {nodeData.data?.deviceType === 'condition' && connectedSources.length > 0 && (

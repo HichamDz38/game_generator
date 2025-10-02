@@ -86,12 +86,12 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
   
 
-  const handleNodeClick = (node, event) => {
-  setSelectedNode(node);
-   const rect = event.currentTarget.getBoundingClientRect();
-  setClickPosition({ x: event.clientX- 300, y: event.clientY - rect.top });
-  setIsEditable(true); // or however you show NodeDetails
-};
+//   const handleNodeClick = (node, event) => {
+//   setSelectedNode(node);
+//    const rect = event.currentTarget.getBoundingClientRect();
+//   setClickPosition({ x: event.clientX- 300, y: event.clientY - rect.top });
+//   setIsEditable(true); // or however you show NodeDetails
+// };
   const customOnNodesChange = useCallback((changes) => {
   const filteredChanges = changes.filter(change => {
     if (change.type === 'remove') {
@@ -1788,7 +1788,7 @@ useEffect(() => {
     scenarioName={currentScenarioName}
     nodes={nodes}
     edges={edges}
-    position={clickPosition}  // new prop
+    position={selectedNode.position}  // new prop
   />
 )}
 
