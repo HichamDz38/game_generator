@@ -18,10 +18,11 @@ import Sidebar from './sidebar';
 import './style.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-
 const nodeTypes = {
   delay: DelayNode,
 };
+
+
 
 const initialNodes = [
   {
@@ -82,8 +83,15 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const [isStart, setisStart] = useState(false);
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
   const [isPaused, setIsPaused] = useState(false);
+  const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
+  
 
-
+  const handleNodeClick = (node, event) => {
+  setSelectedNode(node);
+   const rect = event.currentTarget.getBoundingClientRect();
+  setClickPosition({ x: event.clientX- 300, y: event.clientY - rect.top });
+  setIsEditable(true); // or however you show NodeDetails
+};
   const customOnNodesChange = useCallback((changes) => {
   const filteredChanges = changes.filter(change => {
     if (change.type === 'remove') {
@@ -1772,6 +1780,20 @@ useEffect(() => {
           />
         )}
 
+        {isEditable && selectedNode && (
+  <NodeDetails 
+    nodeData={selectedNode} 
+    onClose={closeNodeDetails}
+    onUpdate={updateNodeData}
+    scenarioName={currentScenarioName}
+    nodes={nodes}
+    edges={edges}
+    position={clickPosition}  // new prop
+  />
+)}
+
+
+{/* 
         {isEditable && (
           <NodeDetails 
             nodeData={selectedNode} 
@@ -1781,7 +1803,7 @@ useEffect(() => {
             nodes={nodes}
             edges={edges}
           />
-        )}
+        )} */}
         
       </ReactFlowProvider>
     </div>
