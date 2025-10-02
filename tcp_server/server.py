@@ -134,5 +134,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"An error occurred while starting the server: {e}")
         connected_devices = {}
-        r.set(name="connected_devices", value=str(connected_devices))
+        r.set(name="connected_devices", value=json.dumps(connected_devices))
         print("Server stopped.")
