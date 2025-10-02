@@ -51,11 +51,12 @@ def start_server(host, port):
 
 
 def handle_client(client_socket, addr):
-    device_id = f"{addr[0]}"
     print(f"Accepted connection from {addr}")
     try:
         device_info = json.loads(client_socket.recv(1024).decode('utf-8'))
         num_nodes = device_info.get("num_nodes", 1)
+        device_name = device_info.get("device_name", "")
+        device_id = f"{addr[0]};{device_name}"
         if num_nodes > 1:
             for i in range(num_nodes):
                 update_device_info(device_id+f"_{i+1}", device_info)
