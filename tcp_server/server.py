@@ -122,7 +122,7 @@ def remove_device(device_id):
     """
     if device_id in connected_devices:
         del connected_devices[device_id]
-        r.set(name="connected_devices", value=str(connected_devices))
+        r.set(name="connected_devices", value=json.dumps(connected_devices))
         print(f"Removed device {device_id} from connected devices.")
     else:
         print(f"Device {device_id} not found in connected devices.")
