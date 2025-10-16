@@ -248,12 +248,12 @@ def save_random_device_config():
     
     devices_list = {
         '127.0.0.1:34914': {
-            'device_name': 'Device1',
+            'device_name': 'shelf',
             'num_hints': 2,
             'status': 'active',
             'config':{
-                "speed":{
-                    'type' : 'number',
+                "solution":{
+                    'type' : 'matrix',
                     'required': True
                 },
                 "direction": {
