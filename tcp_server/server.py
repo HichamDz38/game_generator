@@ -56,10 +56,12 @@ def handle_client(client_socket, addr):
         device_info = json.loads(client_socket.recv(1024).decode('utf-8'))
         num_nodes = device_info.get("num_nodes", 1)
         device_name = device_info.get("device_name", "")
-        device_id = f"{addr[0]};{device_name}"
+        device_id = f"{addr[0]}:{device_name}"
         if num_nodes > 1:
             for i in range(num_nodes):
-                update_device_info(device_id+f"_{i+1}", device_info)
+                instance_device_info = device_info.copy()
+                instance_device_info["device_name"] = device_name+f"_{i+1}"
+                update_device_info(device_id+f"_{i+1}", instance_device_info)
         else:
             update_device_info(device_id, device_info)
     except Exception as e:
@@ -123,7 +125,7 @@ def remove_device(device_id):
     """
     if device_id in connected_devices:
         del connected_devices[device_id]
-        r.set(name="connected_devices", value=json.dumps(connected_devices))
+        r.set(name="connected_devices", value=str(connected_devices))
         print(f"Removed device {device_id} from connected devices.")
     else:
         print(f"Device {device_id} not found in connected devices.")
@@ -135,5 +137,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"An error occurred while starting the server: {e}")
         connected_devices = {}
-        r.set(name="connected_devices", value=json.dumps(connected_devices))
+        r.set(name="connected_devices", value=str(connected_devices))
         print("Server stopped.")
