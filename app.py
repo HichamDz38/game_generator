@@ -219,6 +219,40 @@ def finish(device_id):
     redis_client.lpush(f'{device_id}:commands', "finish")
     return jsonify({'status': 'success'})
 
+@app.route('/stop/<device_id>', methods=['POST'])
+def stop_device(device_id):
+    """
+    Send stop/cancel command to a device (queues command, device will confirm with status update)
+    """
+    try:
+        data = request.get_json() or {}
+        node_id = data.get('nodeId')
+        
+        logger.info(f"Sending stop command to device {device_id} (node: {node_id})")
+        
+        # Queue the stop command - device will process it and update status
+        command_data = {
+            'command': 'stop',
+            'node_id': node_id
+        }
+        redis_client.lpush(f'{device_id}:commands', json.dumps(command_data))
+        
+        logger.info(f"Stop command queued for device {device_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Stop command sent to device {device_id}',
+            'deviceId': device_id,
+            'nodeId': node_id
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error stopping device {device_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to stop device: {str(e)}'
+        }), 500
+
 @app.route('/hint/<device_id>/<hint_id>', methods=['POST'])
 def send_hint(device_id, hint_id):
     redis_client.lpush(f'{device_id}:commands', hint_id)

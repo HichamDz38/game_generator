@@ -18,11 +18,10 @@ import Sidebar from './sidebar';
 import './style.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
 const nodeTypes = {
-  delay: DelayNode,
+  // delay: DelayNode, // Removed - component not available
 };
-
-
 
 const initialNodes = [
   {
@@ -83,15 +82,8 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const [isStart, setisStart] = useState(false);
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
   const [isPaused, setIsPaused] = useState(false);
-  const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
-  
 
-//   const handleNodeClick = (node, event) => {
-//   setSelectedNode(node);
-//    const rect = event.currentTarget.getBoundingClientRect();
-//   setClickPosition({ x: event.clientX- 300, y: event.clientY - rect.top });
-//   setIsEditable(true); // or however you show NodeDetails
-// };
+
   const customOnNodesChange = useCallback((changes) => {
   const filteredChanges = changes.filter(change => {
     if (change.type === 'remove') {
@@ -148,16 +140,22 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   shouldStop: false, 
   globalError: null,
   shouldCompleteEarly: false, 
-  earlyCompletionReason: null 
+  earlyCompletionReason: null,
+  activeNodesByPath: {} // Track which nodes are actively executing on each path
 });
 
 const isRunningRef = useRef(false);
 const isPausedRef = useRef(false);
+const executionStateRef = useRef(executionState);
 
 
   useEffect(() => {
   isPausedRef.current = isPaused;
 }, [isPaused]);
+
+  useEffect(() => {
+    executionStateRef.current = executionState;
+  }, [executionState]);
 
   useEffect(() => {
     isRunningRef.current = executionState.isRunning;
@@ -214,10 +212,24 @@ const isPausedRef = useRef(false);
     console.log(`[${pathId}] Execution resumed - continuing`);
   }
   
-  updateExecutionState(prev => ({
-    ...prev,
-    currentNodes: [...prev.currentNodes, node.id]
-  }));
+  updateExecutionState(prev => {
+    const newActiveNodesByPath = { ...prev.activeNodesByPath };
+    if (pathId) {
+      if (!newActiveNodesByPath[pathId]) {
+        newActiveNodesByPath[pathId] = [];
+      }
+      // Only track device nodes (not virtual or condition nodes)
+      if (node.data.deviceType === 'device') {
+        newActiveNodesByPath[pathId] = [...newActiveNodesByPath[pathId], node.id];
+      }
+    }
+    
+    return {
+      ...prev,
+      currentNodes: [...prev.currentNodes, node.id],
+      activeNodesByPath: newActiveNodesByPath
+    };
+  });
   
   setNodes(nds => nds.map(n => ({
     ...n,
@@ -233,9 +245,6 @@ const isPausedRef = useRef(false);
         break;
       case 'virtual':
         await executeVirtualNode(node);
-        break;
-      case 'delay':
-        await executeDelayNode(node, pathId);
         break;
       case 'condition':
         await executeConditionNode(node, pathId);
@@ -259,6 +268,12 @@ const isPausedRef = useRef(false);
       
       const newCurrentNodes = prev.currentNodes.filter(id => id !== node.id);
       
+      // Remove from activeNodesByPath tracking
+      const newActiveNodesByPath = { ...prev.activeNodesByPath };
+      if (pathId && newActiveNodesByPath[pathId]) {
+        newActiveNodesByPath[pathId] = newActiveNodesByPath[pathId].filter(id => id !== node.id);
+      }
+      
       const newState = {
         completedNodes: newCompletedNodes,
         failedNodes: prev.failedNodes
@@ -272,6 +287,7 @@ const isPausedRef = useRef(false);
         ...prev,
         completedNodes: newCompletedNodes,
         currentNodes: newCurrentNodes,
+        activeNodesByPath: newActiveNodesByPath,
         executionLog: [...prev.executionLog, {
           type: 'success',
           nodeId: node.id,
@@ -370,13 +386,12 @@ const isPausedRef = useRef(false);
       console.log('Device start result:', result);
       
       let status = 'started';
-      let attempts = 0;
-      const maxAttempts = 300;
       const pollInterval = 1000;
       
-      while (status === 'started' && attempts < maxAttempts) {
+      // Wait indefinitely until device reports final status (completed/failed/cancelled)
+      while (status === 'started' || status === 'in progress') {
         if (!isRunningRef.current) {
-          console.log('Execution was stopped - breaking polling loop');
+          console.log('Execution was stopped by user - breaking polling loop');
           throw new Error('Execution was stopped by user');
         }
 
@@ -393,7 +408,7 @@ const isPausedRef = useRef(false);
             const statusData = await statusResponse.json();
             status = statusData.status;
             
-            console.log(`Device ${node.id} status: ${status} (attempt ${attempts})`);
+            console.log(`Device ${node.id} status: ${status}`);
             
             const updateNodeStyle = (currentStatus) => {
               setNodes(nds => nds.map(n => {
@@ -432,25 +447,17 @@ const isPausedRef = useRef(false);
               console.log(`Device ${originalDeviceId} completed successfully`);
               return result;
             } else if (status === 'failed') {
-              throw new Error('Device failed');
+              throw new Error('Device execution failed');
+            } else if (status === 'cancelled') {
+              throw new Error('Device execution was cancelled');
             }
           }
         } catch (statusError) {
-          if (statusError.message === 'Device failed') {
+          if (statusError.message === 'Device execution failed' || statusError.message === 'Device execution was cancelled') {
             throw statusError; 
           }
           console.warn(`Status check failed for device ${originalDeviceId}:`, statusError);
         }
-        
-        attempts++;
-        
-        if (attempts % 10 === 0) {
-          console.log(`Waiting for device ${originalDeviceId}... (${attempts}s elapsed)`);
-        }
-      }
-      
-      if (status === 'in progress') {
-        throw new Error(`Device ${originalDeviceId} timeout after ${maxAttempts} seconds`);
       }
       
       return result;
@@ -477,41 +484,6 @@ const isPausedRef = useRef(false);
     console.log(`Virtual node waiting for ${speed}ms`);
     await new Promise(resolve => setTimeout(resolve, parseInt(speed)));
   };
-
-  const executeDelayNode = async (node, pathId = null) => {
-  const delaySeconds = node.data.config?.delaySeconds?.value || node.data.delaySeconds || 3;
-  console.log(`[${pathId}] Timer node ${node.data.label} starting ${delaySeconds} second delay`);
-  
-  const delayMs = parseInt(delaySeconds) * 1000;
-  const startTime = Date.now();
-  
-  return new Promise((resolve, reject) => {
-    const checkInterval = () => {
-      if (!isRunningRef.current) {
-        console.log(`[${pathId}] Timer ${node.data.label} stopped by user`);
-        reject(new Error('Execution was stopped by user'));
-        return;
-      }
-      
-      if (isPausedRef.current) {
-        setTimeout(checkInterval, 100);
-        return;
-      }
-      
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= delayMs) {
-        console.log(`[${pathId}] Timer node ${node.data.label} completed after ${delaySeconds} seconds`);
-        resolve();
-      } else {
-        setTimeout(checkInterval, 50); 
-      }
-    };
-    
-    checkInterval();
-  });
-};
-
-
 
   const getNextNodes = useCallback((currentNodeId) => {
   const nextEdges = edges.filter(edge => edge.source === currentNodeId);
@@ -655,23 +627,15 @@ const checkForFlowCompletion = useCallback(() => {
   
   console.log('Condition nodes found - checking condition-based completion');
   
-//   const anyOutputCompleted = outputNodes.some(outputNode => 
-//   executionState.completedNodes.includes(outputNode.id)
-// );
+  const anyOutputCompleted = outputNodes.some(outputNode => 
+    executionState.completedNodes.includes(outputNode.id)
+  );
   
-//   if (anyOutputCompleted) {
-//     console.log('Output node reached - flow can complete');
-//   return true;
-// }
+  if (anyOutputCompleted) {
+    console.log('Output node reached - flow can complete');
+    return true;
+  }
   
-const allOutputsCompleted = outputNodes.every(outputNode => 
-  executionState.completedNodes.includes(outputNode.id)
-);
-if (allOutputsCompleted) {
-  console.log("All output nodes reached - flow can complete");
-  return true;
-}
-
   const allConditionNodesResolved = conditionNodes.every(conditionNode => 
     executionState.completedNodes.includes(conditionNode.id) || 
     executionState.failedNodes.includes(conditionNode.id)
@@ -691,9 +655,7 @@ if (allOutputsCompleted) {
   );
   
   console.log('Flow completion based on conditions:', canFlowComplete);
-  // return canFlowComplete;
-  return canFlowComplete && allOutputsCompleted;
-
+  return canFlowComplete;
 }, [nodes, edges, executionState.completedNodes, executionState.failedNodes, executionState.currentNodes,canFlowCompleteBasedOnConditions]);
 
 
@@ -701,24 +663,107 @@ if (allOutputsCompleted) {
 
 
 
-const stopAllActiveExecutions = useCallback(() => {
-  console.log('Stopping all active executions for early completion');
+const stopAllActiveExecutions = useCallback(async (excludePaths = []) => {
+  console.log('Stopping all active executions on non-excluded paths');
   
+  // Get all actively executing device nodes that are NOT on excluded paths
+  const nodesToStop = [];
+  const activeNodesByPath = executionStateRef.current.activeNodesByPath || {};
+  
+  for (const [pathId, nodeIds] of Object.entries(activeNodesByPath)) {
+    if (!excludePaths.includes(pathId)) {
+      nodesToStop.push(...nodeIds);
+    }
+  }
+  
+  if (nodesToStop.length === 0) {
+    console.log('No active devices to stop');
+    return;
+  }
+  
+  console.log(`Stopping ${nodesToStop.length} device nodes:`, nodesToStop);
+  
+  // Send stop commands to all devices and wait for confirmation
+  const stopPromises = nodesToStop.map(async (nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && node.data.originalDeviceId) {
+      try {
+        console.log(`Sending stop command to device ${node.data.originalDeviceId} (node: ${node.data.label})`);
+        
+        // Send stop command
+        const response = await fetch(`${API_BASE_URL}/stop/${node.data.originalDeviceId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId: node.id })
+        });
+        
+        if (!response.ok) {
+          console.warn(`Failed to send stop command to device ${node.data.originalDeviceId}:`, response.statusText);
+          return { nodeId, success: false };
+        }
+        
+        console.log(`Stop command sent to device ${node.data.originalDeviceId}, waiting for confirmation...`);
+        
+        // Poll for status confirmation - wait indefinitely until device responds
+        const pollInterval = 1000;
+        let status = 'in progress';
+        
+        // Wait indefinitely until device confirms with final status
+        while (status === 'in progress' || status === 'started') {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          
+          try {
+            const statusResponse = await fetch(`${API_BASE_URL}/get_status/${node.id}`);
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
+              status = statusData.status;
+              
+              if (status === 'cancelled' || status === 'completed' || status === 'failed') {
+                console.log(`Device ${node.data.originalDeviceId} confirmed status: ${status}`);
+                return { nodeId, success: true, status };
+              }
+            }
+          } catch (statusError) {
+            console.warn(`Status check failed for device ${node.data.originalDeviceId}:`, statusError);
+            // On communication failure, mark as failed
+            return { nodeId, success: false, error: statusError, communicationFailed: true };
+          }
+        }
+        
+        return { nodeId, success: true, status };
+        
+      } catch (error) {
+        console.error(`Error stopping device ${node.data.originalDeviceId}:`, error);
+        return { nodeId, success: false, error };
+      }
+    }
+    return { nodeId, success: false };
+  });
+  
+  const results = await Promise.allSettled(stopPromises);
+  
+  // Update UI to show cancelled nodes
   setNodes(nds => nds.map(n => {
-    if (executionState.currentNodes.includes(n.id)) {
+    if (nodesToStop.includes(n.id)) {
+      const result = results.find(r => r.status === 'fulfilled' && r.value.nodeId === n.id);
+      const success = result?.status === 'fulfilled' && result?.value?.success;
+      
       return {
         ...n,
         style: { 
           ...n.style, 
-          backgroundColor: '#ff9800', 
-          border: '2px solid #f57c00',
+          backgroundColor: success ? '#ff9800' : '#f44336', 
+          border: success ? '2px solid #f57c00' : '2px solid #d32f2f',
           opacity: 0.7
         }
       };
     }
     return n;
   }));
-}, [executionState.currentNodes, setNodes]);
+  
+  const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
+  console.log(`Successfully stopped ${successCount} of ${nodesToStop.length} devices`);
+}, [nodes, setNodes]);
 
 
 
@@ -787,12 +832,11 @@ const executeConditionNode = async (node, pathId = null) => {
   console.log(`[${pathId}] Condition node using ${logicType} logic - monitoring ${conditionDescription}`);
   console.log(`[${pathId}] Monitoring sources: ${sourcesToMonitor.map(s => s.label).join(', ')}`);
 
-  let attempts = 0;
-  const maxAttempts = 6000; 
   const checkInterval = 100;
   let lastLogTime = 0;
 
-  while (attempts < maxAttempts) {
+  // Wait indefinitely until condition is satisfied (no timeout)
+  while (true) {
     if (!isRunningRef.current) {
       throw new Error('Execution was stopped by user');
     }
@@ -849,6 +893,13 @@ const executeConditionNode = async (node, pathId = null) => {
         successMessage = `AND condition satisfied - all ${sourcesToMonitor.length} monitored sources completed`;
       } else {
         successMessage = `OR condition satisfied - ${completedMonitored.length} of ${sourcesToMonitor.length} monitored sources completed`;
+        
+        // For OR condition: stop all devices on other parallel paths immediately
+        console.log(`[${pathId}] OR condition met - stopping devices on other parallel paths`);
+        
+        // Don't exclude any paths - we want to stop ALL currently executing devices
+        // The devices that already completed won't be in activeNodesByPath anyway
+        await stopAllActiveExecutions([]);
       }
       
       console.log(`[${pathId}] ${successMessage}!`);
@@ -856,7 +907,7 @@ const executeConditionNode = async (node, pathId = null) => {
     }
 
     const now = Date.now();
-    if (now - lastLogTime > 5000 && attempts > 0) {
+    if (now - lastLogTime > 5000) {
       console.log(`[${pathId}] Condition ${node.data.label} status - ${logicType} logic, monitoring ${sourcesToMonitor.length} source(s):`, {
         completed: completedMonitored.map(s => s.label),
         failed: failedMonitored.map(s => s.label),
@@ -868,19 +919,6 @@ const executeConditionNode = async (node, pathId = null) => {
     }
 
     await new Promise(resolve => setTimeout(resolve, checkInterval));
-    attempts++;
-  }
-  
-  if (attempts >= maxAttempts) {
-    const pendingLabels = sourcesToMonitor
-      .filter(source => 
-        !completionStateRef.current.completedNodes.includes(source.nodeId) && 
-        !completionStateRef.current.failedNodes.includes(source.nodeId)
-      )
-      .map(s => s.label);
-    
-    const timeoutMinutes = (maxAttempts * checkInterval) / 60000;
-    throw new Error(`Condition timeout after ${timeoutMinutes} minutes - still waiting for: ${pendingLabels.join(', ')}`);
   }
   
   console.log(`[${pathId}] Condition node ${node.data.label} (${logicType}) satisfied - proceeding to next nodes`);
@@ -1166,9 +1204,7 @@ const executeConditionNode = async (node, pathId = null) => {
     return;
   }
   
-  if (clickedNode.data.deviceType === 'delay') {
-    setSelectedNode(clickedNode);
-  } else if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
+  if (!(clickedNode.type === 'input' || clickedNode.type === 'output')) {
     setSelectedNode(clickedNode);
   }
 };
@@ -1780,20 +1816,6 @@ useEffect(() => {
           />
         )}
 
-        {isEditable && selectedNode && (
-  <NodeDetails 
-    nodeData={selectedNode} 
-    onClose={closeNodeDetails}
-    onUpdate={updateNodeData}
-    scenarioName={currentScenarioName}
-    nodes={nodes}
-    edges={edges}
-    position={selectedNode.position}  // new prop
-  />
-)}
-
-
-{/* 
         {isEditable && (
           <NodeDetails 
             nodeData={selectedNode} 
@@ -1803,7 +1825,7 @@ useEffect(() => {
             nodes={nodes}
             edges={edges}
           />
-        )} */}
+        )}
         
       </ReactFlowProvider>
     </div>
