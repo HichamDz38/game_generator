@@ -371,7 +371,7 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
                 onDragStart={(event) => onDragStart(
                   event, 
                   'device', 
-                  `${deviceData.device_name}-${uniqueId}`, 
+                  `${deviceData.device_name}`, 
                   // `${deviceData.device_name}-${deviceId}/${uniqueId}`, 
                   deviceData.config, 
                   deviceData,

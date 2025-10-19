@@ -249,7 +249,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
     >
       <div className={styles.nodeDetailsContent}>
         <p><strong>Name:</strong> {nodeData.data?.label}</p>
-        <p><strong>IP:</strong> {nodeData.data?.originalDeviceId}</p>
+        <p><strong>IP:</strong> {nodeData.data?.originalDeviceId?.split(':')[0] || nodeData.data?.originalDeviceId}</p>
         <p><strong>Type:</strong> {nodeData.type}</p>
 
         {nodeData.data?.deviceType === 'condition' && connectedSources.length > 0 && (
