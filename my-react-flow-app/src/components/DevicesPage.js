@@ -31,23 +31,22 @@ const DevicesPage = () => {
   };
 
   useEffect(() => {
+    // Fetch only on page load
     fetchDevices();
     fetchServerStatus();
-    
-    // Poll for updates every 2 seconds
-    const interval = setInterval(() => {
-      fetchDevices();
-      fetchServerStatus();
-    }, 2000);
-
-    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const refreshData = () => {
+    fetchDevices();
+    fetchServerStatus();
+  };
 
   const handleStartServer = async () => {
     setLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/tcp_server/start`);
-      await fetchServerStatus();
+      refreshData();
       alert('TCP Server started successfully');
     } catch (error) {
       console.error('Error starting server:', error);
@@ -60,7 +59,7 @@ const DevicesPage = () => {
     setLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/tcp_server/stop`);
-      await fetchServerStatus();
+      refreshData();
       alert('TCP Server stopped successfully');
     } catch (error) {
       console.error('Error stopping server:', error);
@@ -77,9 +76,8 @@ const DevicesPage = () => {
     setLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/devices/disconnect/${deviceId}`);
-      alert(`Device ${deviceId} disconnected`);
-      // Wait a moment then refresh
-      setTimeout(fetchDevices, 1000);
+      // Refresh devices after disconnect
+      setTimeout(refreshData, 1000);
     } catch (error) {
       console.error('Error disconnecting device:', error);
       alert('Failed to disconnect device');
@@ -101,9 +99,8 @@ const DevicesPage = () => {
     setLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/devices/disconnect_all`);
-      alert(`All devices disconnected`);
-      // Wait a moment then refresh
-      setTimeout(fetchDevices, 1000);
+      // Refresh devices after disconnect all
+      setTimeout(refreshData, 1000);
     } catch (error) {
       console.error('Error disconnecting all devices:', error);
       alert('Failed to disconnect all devices');
@@ -123,124 +120,109 @@ const DevicesPage = () => {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>Device Management</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '10px',
-            padding: '10px 20px',
-            background: '#f5f5f5',
-            borderRadius: '5px'
+    <div className={styles.Scenariopp}>
+      <h1 className={styles.title}>Device Management</h1>
+
+      {/* Server Control Section */}
+      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <div style={{ 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          gap: '20px',
+          padding: '15px 30px',
+          background: '#f5f5f5',
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }}>
+          <span style={{ fontWeight: 'bold', fontSize: '18px' }}>Server Status:</span>
+          <span style={{ 
+            color: getStatusColor(),
+            fontWeight: 'bold',
+            fontSize: '18px',
+            textTransform: 'uppercase'
           }}>
-            <span style={{ fontWeight: 'bold' }}>Server Status:</span>
-            <span style={{ 
-              color: getStatusColor(),
-              fontWeight: 'bold',
-              textTransform: 'uppercase'
-            }}>
-              {serverStatus}
-            </span>
-          </div>
+            {serverStatus}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+          {serverStatus === 'running' ? (
+            <button 
+              className={`${styles.theme__button} ${styles.stopButton}`}
+              onClick={handleStopServer}
+              disabled={loading}
+              style={{ fontSize: '20px', padding: '15px 40px' }}
+            >
+              STOP SERVER
+            </button>
+          ) : (
+            <button 
+              className={styles.theme__button}
+              onClick={handleStartServer}
+              disabled={loading}
+              style={{ fontSize: '20px', padding: '15px 40px' }}
+            >
+              START SERVER
+            </button>
+          )}
+          
+          <button 
+            className={styles.theme__button}
+            onClick={handleDisconnectAll}
+            disabled={loading || Object.keys(devices).length === 0}
+            style={{ fontSize: '20px', padding: '15px 40px' }}
+          >
+            DISCONNECT ALL ({Object.keys(devices).length})
+          </button>
         </div>
       </div>
 
-      <div style={{ 
-        display: 'flex', 
-        gap: '10px', 
-        marginBottom: '20px',
-        padding: '20px',
-        background: '#f9f9f9',
-        borderRadius: '8px'
-      }}>
-        {serverStatus === 'running' ? (
-          <button 
-            className={`${styles.theme__button} ${styles.stopButton}`}
-            onClick={handleStopServer}
-            disabled={loading}
-          >
-            STOP SERVER
-          </button>
-        ) : (
-          <button 
-            className={styles.theme__button}
-            onClick={handleStartServer}
-            disabled={loading}
-          >
-            START SERVER
-          </button>
-        )}
-        
-        <button 
-          className={styles.theme__button}
-          onClick={handleDisconnectAll}
-          disabled={loading || Object.keys(devices).length === 0}
-        >
-          DISCONNECT ALL ({Object.keys(devices).length})
-        </button>
-      </div>
+      {/* Devices List */}
+      <h2 className={styles.secondtitle}>Connected Devices</h2>
 
-      <div className={styles.devicesGrid}>
-        {Object.keys(devices).length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '40px', 
-            color: '#666',
-            fontSize: '18px'
-          }}>
-            No devices connected
-          </div>
-        ) : (
-          Object.entries(devices).map(([deviceId, deviceInfo]) => (
-            <div key={deviceId} className={styles.deviceCard}>
-              <div className={styles.deviceHeader}>
-                <h3>{deviceInfo.device_name || deviceId}</h3>
-                <span className={styles.deviceId}>{deviceId}</span>
+      {Object.keys(devices).length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px', 
+          color: '#666',
+          fontSize: '20px',
+          fontStyle: 'italic'
+        }}>
+          No devices connected
+        </div>
+      ) : (
+        Object.entries(devices).map(([deviceId, deviceInfo]) => (
+          <div key={deviceId} className={styles.scenariosbox}>
+            <div style={{ flex: 1 }}>
+              <div className={styles.name_scenario}>
+                {deviceInfo.device_name || deviceId}
               </div>
-              
-              <div className={styles.deviceInfo}>
-                <div className={styles.infoRow}>
-                  <span className={styles.label}>Type:</span>
-                  <span className={styles.value}>{deviceInfo.node_type || 'Unknown'}</span>
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', fontFamily: 'monospace' }}>
+                ID: {deviceId}
+              </div>
+              {deviceInfo.node_type && (
+                <div style={{ fontSize: '14px', color: '#555', marginTop: '5px' }}>
+                  Type: {deviceInfo.node_type}
                 </div>
-                
-                {deviceInfo.num_nodes && deviceInfo.num_nodes > 1 && (
-                  <div className={styles.infoRow}>
-                    <span className={styles.label}>Nodes:</span>
-                    <span className={styles.value}>{deviceInfo.num_nodes}</span>
-                  </div>
-                )}
-                
-                {deviceInfo.config && Object.keys(deviceInfo.config).length > 0 && (
-                  <div className={styles.infoRow}>
-                    <span className={styles.label}>Configuration:</span>
-                    <div className={styles.configList}>
-                      {Object.entries(deviceInfo.config).map(([key, value]) => (
-                        <div key={key} className={styles.configItem}>
-                          <span className={styles.configKey}>{key}:</span>
-                          <span className={styles.configValue}>
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              
+              )}
+              {deviceInfo.num_nodes && deviceInfo.num_nodes > 1 && (
+                <div style={{ fontSize: '14px', color: '#555' }}>
+                  Nodes: {deviceInfo.num_nodes}
+                </div>
+              )}
+            </div>
+            <div className={styles.buttongroupe}>
               <button 
-                className={`${styles.theme__button} ${styles.disconnectButton}`}
+                className={styles.delete}
                 onClick={() => handleDisconnectDevice(deviceId)}
                 disabled={loading}
               >
-                DISCONNECT
+                disconnect
               </button>
             </div>
-          ))
-        )}
-      </div>
+          </div>
+        ))
+      )}
     </div>
   );
 };
