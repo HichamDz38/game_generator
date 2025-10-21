@@ -249,6 +249,13 @@ const executionStateRef = useRef(executionState);
       case 'condition':
         await executeConditionNode(node, pathId);
         break;
+      case 'delay':
+        // Timer node - wait for specified seconds then complete
+        const delaySeconds = node.data.config?.delaySeconds?.value || node.data.config?.delaySeconds || 3;
+        console.log(`[${pathId}] Timer node ${node.data.label} waiting for ${delaySeconds} seconds`);
+        await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+        console.log(`[${pathId}] Timer node ${node.data.label} completed after ${delaySeconds} seconds`);
+        break;
       case 'input':
       case 'output':
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -765,7 +772,56 @@ const stopAllActiveExecutions = useCallback(async (excludePaths = []) => {
   console.log(`Successfully stopped ${successCount} of ${nodesToStop.length} devices`);
 }, [nodes, setNodes]);
 
+// Function to stop/clear all connected devices via backend broadcast
+const stopAllDevices = useCallback(async () => {
+  console.log('Broadcasting stop command to all connected devices...');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/stop_all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to broadcast stop command to devices');
+      return;
+    }
+    
+    const result = await response.json();
+    console.log(`Stop command broadcasted: ${result.message}`);
+    
+  } catch (error) {
+    console.error('Error broadcasting stop to all devices:', error);
+  }
+}, []);
 
+// Helper function to check if a node is downstream from specific source nodes
+const isDownstreamFrom = (targetNodeId, sourceNodeIds, edges, nodes) => {
+  const visited = new Set();
+  const queue = [targetNodeId];
+  
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+    
+    // Check if we've reached one of the source nodes
+    if (sourceNodeIds.includes(currentId)) {
+      return true;
+    }
+    
+    // Find all nodes that connect TO the current node (going backwards/upstream)
+    const incomingEdges = edges.filter(edge => edge.target === currentId);
+    for (const edge of incomingEdges) {
+      if (!visited.has(edge.source)) {
+        queue.push(edge.source);
+      }
+    }
+  }
+  
+  return false;
+};
 
 const executeConditionNode = async (node, pathId = null) => {
   const { config } = node.data;
@@ -894,12 +950,104 @@ const executeConditionNode = async (node, pathId = null) => {
       } else {
         successMessage = `OR condition satisfied - ${completedMonitored.length} of ${sourcesToMonitor.length} monitored sources completed`;
         
-        // For OR condition: stop all devices on other parallel paths immediately
-        console.log(`[${pathId}] OR condition met - stopping devices on other parallel paths`);
+        // For OR condition: stop actively executing devices that are downstream from pending (incomplete) sources
+        console.log(`[${pathId}] OR condition met - stopping devices on other parallel source paths`);
         
-        // Don't exclude any paths - we want to stop ALL currently executing devices
-        // The devices that already completed won't be in activeNodesByPath anyway
-        await stopAllActiveExecutions([]);
+        // Find source nodes that are still pending (not completed and not failed)
+        const pendingSourceNodeIds = sourcesToMonitor
+          .filter(source => !currentCompleted.includes(source.nodeId) && !currentFailed.includes(source.nodeId))
+          .map(source => source.nodeId);
+        
+        if (pendingSourceNodeIds.length > 0) {
+          console.log(`[${pathId}] Pending source nodes:`, pendingSourceNodeIds);
+          
+          // Get all currently active devices
+          const activeNodesByPath = executionStateRef.current.activeNodesByPath || {};
+          const allActiveNodes = [];
+          for (const [path, nodeIds] of Object.entries(activeNodesByPath)) {
+            allActiveNodes.push(...nodeIds);
+          }
+          
+          // Filter active nodes to find those downstream from pending sources
+          const nodesToStop = allActiveNodes.filter(activeNodeId => 
+            isDownstreamFrom(activeNodeId, pendingSourceNodeIds, edges, nodes)
+          );
+          
+          if (nodesToStop.length > 0) {
+            console.log(`[${pathId}] Stopping ${nodesToStop.length} active devices from pending branches:`, nodesToStop);
+            
+            // Stop each device
+            const stopPromises = nodesToStop.map(async (nodeId) => {
+              const node = nodes.find(n => n.id === nodeId);
+              if (node && node.data.originalDeviceId) {
+                try {
+                  console.log(`[${pathId}] Sending stop to device: ${node.data.label}`);
+                  
+                  const response = await fetch(`${API_BASE_URL}/stop/${node.data.originalDeviceId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodeId: node.id })
+                  });
+                  
+                  if (!response.ok) {
+                    console.warn(`Failed to stop device ${node.data.originalDeviceId}`);
+                    return { nodeId, success: false };
+                  }
+                  
+                  // Wait for status confirmation
+                  let status = 'in progress';
+                  while (status === 'in progress' || status === 'started') {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    try {
+                      const statusResponse = await fetch(`${API_BASE_URL}/get_status/${node.id}`);
+                      if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+                        status = statusData.status;
+                        
+                        if (status === 'cancelled' || status === 'completed' || status === 'failed') {
+                          console.log(`Device ${node.data.originalDeviceId} confirmed: ${status}`);
+                          return { nodeId, success: true, status };
+                        }
+                      }
+                    } catch (error) {
+                      console.warn(`Status check failed for ${node.data.originalDeviceId}:`, error);
+                      return { nodeId, success: false, error };
+                    }
+                  }
+                  
+                  return { nodeId, success: true, status };
+                } catch (error) {
+                  console.error(`Error stopping device ${node.data.originalDeviceId}:`, error);
+                  return { nodeId, success: false, error };
+                }
+              }
+              return { nodeId, success: false };
+            });
+            
+            await Promise.allSettled(stopPromises);
+            
+            // Update UI to show cancelled nodes
+            setNodes(nds => nds.map(n => {
+              if (nodesToStop.includes(n.id)) {
+                return {
+                  ...n,
+                  style: { 
+                    ...n.style, 
+                    backgroundColor: '#ff9800', 
+                    border: '2px solid #f57c00',
+                    opacity: 0.7
+                  }
+                };
+              }
+              return n;
+            }));
+          } else {
+            console.log(`[${pathId}] No active devices found in pending branches`);
+          }
+        } else {
+          console.log(`[${pathId}] No pending source nodes - all are completed or failed`);
+        }
       }
       
       console.log(`[${pathId}] ${successMessage}!`);
@@ -1037,6 +1185,10 @@ const executeConditionNode = async (node, pathId = null) => {
 };
 
   const handleStartExecution = async () => {
+  // Stop all devices before starting
+  console.log('Clearing all devices before starting scenario...');
+  await stopAllDevices();
+  
   setisStart(true);
   isRunningRef.current = true;
   
@@ -1078,6 +1230,10 @@ const executeConditionNode = async (node, pathId = null) => {
     
     console.log('Flow execution completed normally');
     
+    // Stop all devices when scenario completes
+    console.log('Stopping all devices after scenario completion...');
+    await stopAllDevices();
+    
     setNodes(nds => nds.map(n => ({
       ...n,
       style: { ...n.style, backgroundColor: undefined, border: undefined }
@@ -1098,6 +1254,10 @@ const executeConditionNode = async (node, pathId = null) => {
 
   } catch (error) {
     console.error('Flow execution failed:', error);
+    
+    // Stop all devices when scenario fails or is stopped
+    console.log('Stopping all devices after scenario error/stop...');
+    await stopAllDevices();
     
     setNodes(nds => nds.map(n => ({
       ...n,

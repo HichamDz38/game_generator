@@ -276,6 +276,52 @@ def reset_all():
             redis_client.lpush(f'{device_id}:commands', "reset")
     return jsonify({'status': 'success'})
 
+@app.route('/stop_all', methods=['POST'])
+def stop_all():
+    """
+    Broadcast stop command to all connected devices via Redis
+    All devices will receive and process the stop command in parallel
+    """
+    try:
+        logger.info("Broadcasting stop command to all connected devices...")
+        
+        connected_dev = redis_client.get("connected_devices")
+        if not connected_dev:
+            logger.info("No connected devices found")
+            return jsonify({
+                'status': 'success',
+                'message': 'No devices to stop',
+                'devices_stopped': 0
+            }), 200
+        
+        devices = json.loads(connected_dev.replace("'", '"'))
+        device_count = 0
+        
+        # Send stop command to all devices via Redis
+        for device_id in devices.keys():
+            command_data = {
+                'command': 'stop',
+                'node_id': None
+            }
+            redis_client.lpush(f'{device_id}:commands', json.dumps(command_data))
+            device_count += 1
+            logger.info(f"Stop command queued for device: {device_id}")
+        
+        logger.info(f"Stop command broadcasted to {device_count} devices")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Stop command sent to {device_count} devices',
+            'devices_stopped': device_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error broadcasting stop to all devices: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to stop all devices: {str(e)}'
+        }), 500
+
 
 @app.route('/set_random_devices', methods=['GET'])
 def save_random_device_config():
@@ -488,6 +534,109 @@ def get_status(node_id):
         return jsonify({
             'status': 'error',
             'message': f'Failed to get device status: {str(e)}'
+        }), 500
+
+
+@app.route('/tcp_server/status', methods=['GET'])
+def get_server_status():
+    """Get TCP server status"""
+    try:
+        status = redis_client.get("tcp_server:status") or "stopped"
+        return jsonify({
+            'status': status
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting server status: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/tcp_server/start', methods=['POST'])
+def start_tcp_server():
+    """Start TCP server"""
+    try:
+        redis_client.set("tcp_server:status", "running")
+        logger.info("TCP server start command issued")
+        return jsonify({
+            'status': 'success',
+            'message': 'TCP server started'
+        }), 200
+    except Exception as e:
+        logger.error(f"Error starting server: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/tcp_server/stop', methods=['POST'])
+def stop_tcp_server():
+    """Stop TCP server"""
+    try:
+        redis_client.set("tcp_server:status", "stopped")
+        logger.info("TCP server stop command issued")
+        return jsonify({
+            'status': 'success',
+            'message': 'TCP server stopped'
+        }), 200
+    except Exception as e:
+        logger.error(f"Error stopping server: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/devices/disconnect/<device_id>', methods=['POST'])
+def disconnect_device(device_id):
+    """Disconnect a specific device by setting disconnect flag in Redis"""
+    try:
+        # Set disconnect flag - TCP server will close socket and cleanup
+        redis_client.set(f"{device_id}:disconnect", "true")
+        redis_client.expire(f"{device_id}:disconnect", 10)  # Auto-expire after 10 seconds
+        logger.info(f"Disconnect command issued for device: {device_id}")
+        return jsonify({
+            'status': 'success',
+            'message': f'Device {device_id} disconnect initiated'
+        }), 200
+    except Exception as e:
+        logger.error(f"Error disconnecting device: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/devices/disconnect_all', methods=['POST'])
+def disconnect_all_devices():
+    """Disconnect all connected devices by setting disconnect flags"""
+    try:
+        connected_devices_str = redis_client.get("connected_devices")
+        if connected_devices_str:
+            connected_devices = json.loads(connected_devices_str)
+            disconnected_count = 0
+            for device_id in connected_devices.keys():
+                redis_client.set(f"{device_id}:disconnect", "true")
+                redis_client.expire(f"{device_id}:disconnect", 10)
+                disconnected_count += 1
+            
+            logger.info(f"Disconnect command issued for all {disconnected_count} devices")
+            return jsonify({
+                'status': 'success',
+                'message': f'{disconnected_count} devices disconnect initiated'
+            }), 200
+        else:
+            return jsonify({
+                'status': 'success',
+                'message': 'No devices connected'
+            }), 200
+    except Exception as e:
+        logger.error(f"Error disconnecting all devices: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         }), 500
 
 

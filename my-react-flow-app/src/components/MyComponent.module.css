@@ -504,3 +504,127 @@ select {
 .configField {
   margin-bottom: 15px;
 }
+
+/* Devices Page Styles */
+.container {
+  padding: 80px 20px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  color: #333;
+  font-size: 32px;
+  margin: 0;
+}
+
+.devicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.deviceCard {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.deviceCard:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.deviceHeader {
+  border-bottom: 2px solid #aa80ff;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.deviceHeader h3 {
+  margin: 0 0 5px 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.deviceId {
+  font-size: 12px;
+  color: #666;
+  font-family: monospace;
+}
+
+.deviceInfo {
+  margin-bottom: 15px;
+}
+
+.infoRow {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.label {
+  font-weight: bold;
+  min-width: 120px;
+  color: #555;
+}
+
+.value {
+  color: #333;
+}
+
+.configList {
+  flex: 1;
+}
+
+.configItem {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.configKey {
+  font-weight: 500;
+  color: #666;
+}
+
+.configValue {
+  color: #333;
+  word-break: break-word;
+}
+
+.disconnectButton {
+  width: 100%;
+  background-color: #f44336 !important;
+  color: white !important;
+  margin-top: 10px;
+}
+
+.disconnectButton:hover {
+  background-color: #d32f2f !important;
+}
+
+.disconnectButton:disabled {
+  background-color: #ccc !important;
+  cursor: not-allowed;
+}
+
+.stopButton {
+  background-color: #f44336 !important;
+  color: white !important;
+}
+
+.stopButton:hover {
+  background-color: #d32f2f !important;
+}

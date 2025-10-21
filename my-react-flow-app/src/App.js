@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "reactflow";
 import DnDFlow from "./DragDrop/DnDFlow";
 import Navbar from "./components/Navbar";
 import Scenariopage from "./components/Scenariopage";
+import DevicesPage from "./components/DevicesPage";
 import { Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 
 function FlowEditorWrapper({ onFlowRunningChange }) {
@@ -42,10 +43,17 @@ export default function App() {
     }
   };
 
+  const handleNavigateToDevices = () => {
+    if (!isFlowRunning) {
+      navigate("/devices");
+    }
+  };
+
   return (
     <div className="app">
       <Navbar
         onReturnScenarioSelect={handleReturnScenarioSelect}
+        onNavigateToDevices={handleNavigateToDevices}
         isFlowRunning={isFlowRunning}
       />
       <div style={{ display: "flex", flex: 1 }}>
@@ -60,6 +68,10 @@ export default function App() {
                 onCreateNew={() => navigate("/flow")}
               />
             }
+          />
+          <Route
+            path="/devices"
+            element={<DevicesPage />}
           />
           <Route
             path="/flow/:scenarioName?"

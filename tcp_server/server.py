@@ -5,11 +5,14 @@ import redis
 import time
 import os
 import requests
+import errno
 
 HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 65432      # Port to listen on
 connected_devices = {}
+client_connections = {}  # Map device_id to client_socket for disconnect control
 backend_url = os.getenv("REACT_APP_API_BASE_URL")
+server_running = True  # Flag to control server operation
 # Redis client
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
 
@@ -38,28 +41,55 @@ def send_file(client_socket, image_path):
 
 
 def start_server(host, port):
+    global server_running
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((host, port))
     server_socket.listen(5)  # Allow up to 5 pending connections
+    server_socket.settimeout(1.0)  # Check for stop command every second
     print(f"Listening on {host}:{port}")
+    
+    # Set server status to running in Redis
+    r.set("tcp_server:status", "running")
 
-    while True:
-        client_socket, addr = server_socket.accept()
-        client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
-        client_handler.start()
+    while server_running:
+        # Check if server should stop
+        server_status = r.get("tcp_server:status")
+        if server_status == "stopped":
+            print("[!] Server stop command received")
+            server_running = False
+            break
+            
+        try:
+            client_socket, addr = server_socket.accept()
+            client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
+            client_handler.start()
+        except socket.timeout:
+            # Normal timeout, continue loop to check status
+            continue
+        except Exception as e:
+            print(f"[!] Error accepting connection: {e}")
+    
+    print("[+] Server shutting down...")
+    server_socket.close()
+    r.set("tcp_server:status", "stopped")
 
 
-def register_device(device_info, addr):
+def register_device(device_info, addr, client_socket):
     """Register device and return device_id, num_nodes"""
     num_nodes = device_info.get("num_nodes", 1)
     device_name = device_info.get("device_name", "")
     device_id = f"{addr[0]}:{device_name}"
+    
+    # Store socket connection for disconnect control
+    client_connections[device_id] = client_socket
     
     if num_nodes > 1:
         for i in range(num_nodes):
             instance_device_info = device_info.copy()
             instance_device_info["device_name"] = device_name+f"_{i+1}"
             update_device_info(device_id+f"_{i+1}", instance_device_info)
+            client_connections[f"{device_id}_{i+1}"] = client_socket
     else:
         update_device_info(device_id, device_info)
     
@@ -151,24 +181,76 @@ def cleanup_device(device_id, num_nodes):
     """Remove device from connected devices and clean up Redis"""
     cleanup_redis_data(device_id, num_nodes)
     
+    # Remove from client_connections
+    if device_id in client_connections:
+        del client_connections[device_id]
+    
     if num_nodes > 1:
         for i in range(num_nodes):
-            remove_device(f"{device_id}_{i+1}")
+            instance_id = f"{device_id}_{i+1}"
+            remove_device(instance_id)
+            if instance_id in client_connections:
+                del client_connections[instance_id]
     else:
         remove_device(device_id)
 
 
 def handle_client(client_socket, addr):
+    global server_running
     print(f"Accepted connection from {addr}")
+    
+    # Check if server is stopping
+    if not server_running or r.get("tcp_server:status") == "stopped":
+        print(f"[!] Server stopping, rejecting connection from {addr}")
+        client_socket.close()
+        return
+    
+    # Enable TCP keepalive to detect dead connections (more lenient settings)
+    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    
+    # Configure keepalive parameters (Linux-specific) - more lenient
+    # After 60 seconds of idle, start sending keepalive probes
+    # Send 3 probes, 10 seconds apart
+    # If no response after 60 + (3 * 10) = 90 seconds, connection is dead
+    try:
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)   # Start probes after 60s idle
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)  # 10s between probes
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)     # 3 probes before giving up
+        print(f"[+] TCP keepalive enabled for {addr}")
+    except AttributeError:
+        # Not all platforms support these options
+        print(f"[!] Platform doesn't support TCP keepalive configuration, using defaults")
+    
+    # No socket timeout - let keepalive handle dead connections
+    # This prevents timeout errors during long waits for commands
+    
     try:
         device_info = json.loads(client_socket.recv(4096).decode('utf-8'))
-        device_id, num_nodes = register_device(device_info, addr)
+        device_id, num_nodes = register_device(device_info, addr, client_socket)
     except Exception as e:
         print(f"[!] Error receiving initial device info: {e}")
+        client_socket.close()
         return
 
     index = 0
+    
     while True:
+        # Check if server is stopping
+        if not server_running or r.get("tcp_server:status") == "stopped":
+            print(f"[!] Server stopping, disconnecting device {device_id}")
+            client_socket.close()
+            cleanup_device(device_id, num_nodes)
+            break
+            
+        # Check if device should be disconnected
+        disconnect_cmd = r.get(f"{device_id}:disconnect")
+        if disconnect_cmd == "true":
+            print(f"[!] Disconnect command received for device {device_id}")
+            r.delete(f"{device_id}:disconnect")
+            client_socket.close()
+            cleanup_device(device_id, num_nodes)
+            break
+        
         try:
             command = get_command_for_device(device_id, num_nodes, index)
                 
@@ -178,7 +260,7 @@ def handle_client(client_socket, addr):
             if num_nodes > 1:
                 index = (index+1) % num_nodes
                 
-        except (socket.error, ConnectionResetError, BrokenPipeError) as e:
+        except (socket.error, ConnectionResetError, BrokenPipeError, ConnectionError) as e:
             print(f"[!] Communication error with device {device_id}: {e}")
             print(f"[!] Marking all pending operations as failed")
             
@@ -249,9 +331,20 @@ def remove_device(device_id):
 
 if __name__ == "__main__":
     try:
+        # Initialize server status
+        r.set("tcp_server:status", "running")
+        print("[+] TCP Server starting...")
+        
         start_server(HOST, PORT)
+    except KeyboardInterrupt:
+        print("\n[!] Server interrupted by user")
+        server_running = False
+        r.set("tcp_server:status", "stopped")
     except Exception as e:
         print(f"An error occurred while starting the server: {e}")
+        server_running = False
+        r.set("tcp_server:status", "stopped")
+    finally:
         connected_devices = {}
         r.set(name="connected_devices", value=json.dumps(connected_devices))
         print("Server stopped.")

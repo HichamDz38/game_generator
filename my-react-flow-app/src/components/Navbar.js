@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './MyComponent.module.css';
 
-function Navbarr({ onReturnScenarioSelect, isFlowRunning }) {
+function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning }) {
   const handleReturnScenarioClick = (e) => {
     if (isFlowRunning) {
       e.preventDefault();
@@ -10,6 +10,17 @@ function Navbarr({ onReturnScenarioSelect, isFlowRunning }) {
     
     if (onReturnScenarioSelect) {
       onReturnScenarioSelect();
+    }
+  };
+
+  const handleDevicesClick = (e) => {
+    e.preventDefault();
+    if (isFlowRunning) {
+      return;
+    }
+    
+    if (onNavigateToDevices) {
+      onNavigateToDevices();
     }
   };
 
@@ -32,7 +43,20 @@ function Navbarr({ onReturnScenarioSelect, isFlowRunning }) {
             SCENARIOS
             {isFlowRunning && " (Disabled during execution)"}
           </a>
-          <a href="/props">PROPS</a>
+          <a 
+            href="/devices"
+            onClick={handleDevicesClick}
+            className={isFlowRunning ? styles.disabled : ''}
+            style={{
+              cursor: isFlowRunning ? 'not-allowed' : 'pointer',
+              opacity: isFlowRunning ? 0.5 : 1,
+              pointerEvents: isFlowRunning ? 'none' : 'auto'
+            }}
+            title={isFlowRunning ? "Cannot navigate while flow is running" : "Manage devices"}
+          >
+            DEVICES
+            {isFlowRunning && " (Disabled during execution)"}
+          </a>
           <a href="/sound">SOUND</a>
           <a href="/settings">SETTINGS</a>
           <a href="/exit">EXIT</a>
