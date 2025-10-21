@@ -114,11 +114,9 @@ def process_command(client_socket, command, index):
         command = json.dumps(command_data)
         node_id = command_data.get("node_id")
         
-        if not node_id:
-            print("[!] Warning: command has no node_id")
-            return
+        if node_id:
         
-        r.set(f"flow_execution:{node_id}", "started")
+            r.set(f"flow_execution:{node_id}", "started")
         
         # Send command to device
         client_socket.sendall(command.encode("utf-8"))
