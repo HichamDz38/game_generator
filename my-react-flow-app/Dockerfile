@@ -1,4 +1,5 @@
 
+
 # Use Node.js official image
 FROM node:18-alpine
 
@@ -8,9 +9,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with clean cache and no symlinks
-RUN npm cache clean --force && \
-    npm install --no-optional --legacy-peer-deps
+# Clean install without using cache to avoid corruption
+# Remove cache directory first, then install with --cache=/tmp/empty-cache
+RUN rm -rf /root/.npm && \
+    npm install --cache=/tmp/empty-cache --prefer-offline --no-audit
 
 # Copy source code
 COPY . .
