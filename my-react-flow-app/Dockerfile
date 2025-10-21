@@ -8,8 +8,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with clean cache and no symlinks
+RUN npm cache clean --force && \
+    npm install --no-optional --legacy-peer-deps
 
 # Copy source code
 COPY . .
