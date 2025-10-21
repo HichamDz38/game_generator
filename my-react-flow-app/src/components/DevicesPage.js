@@ -11,7 +11,7 @@ const DevicesPage = () => {
 
   const fetchDevices = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/devices`);
+      const response = await axios.get(`${API_BASE_URL}/get_devices`);
       if (response.data && response.data.connected_devices) {
         setDevices(response.data.connected_devices);
       }
