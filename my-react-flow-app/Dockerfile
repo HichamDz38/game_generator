@@ -1,7 +1,7 @@
 
 
-# Use Node.js official image
-FROM node:18-alpine
+# Use Node.js 20 (required by react-router 7.8.0)
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
