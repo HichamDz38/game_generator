@@ -41,11 +41,11 @@ def send_file(client_socket, image_path):
 
 
 def start_server(host, port):
-    server_running = r.get("tcp_server:status", "running") == "running"
+    server_running = r.get("tcp_server:status") == "running"
     while not server_running:
         print("[+] TCP Server STOPPED By Admin System...")
         time.sleep(10)
-        server_running = r.get("tcp_server:status", "running") == "running"
+        server_running = r.get("tcp_server:status") == "running"
 
     print("[+] TCP Server is RUNNING...")
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
