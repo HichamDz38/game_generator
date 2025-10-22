@@ -235,7 +235,7 @@ def handle_client(client_socket, addr):
     
     while True:
         # Check if server is stopping
-        if not server_running or r.get("tcp_server:status") == "stopped":
+        if r.get("tcp_server:status") == "stopped":
             print(f"[!] Server stopping, disconnecting device {device_id}")
             client_socket.close()
             cleanup_device(device_id, num_nodes)
