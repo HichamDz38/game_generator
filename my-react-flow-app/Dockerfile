@@ -1,7 +1,6 @@
 
-
-# Use Node.js 20 (required by react-router 7.8.0)
-FROM node:20-alpine
+# Use Node.js official image
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
@@ -9,10 +8,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Clean install without using cache to avoid corruption
-# Remove cache directory first, then install with --cache=/tmp/empty-cache
-RUN rm -rf /root/.npm && \
-    npm install --cache=/tmp/empty-cache --prefer-offline --no-audit
+# Install dependencies
+# Use npm install instead of npm ci for better ARM compatibility
+RUN npm install --legacy-peer-deps || npm install --force
 
 # Copy source code
 COPY . .

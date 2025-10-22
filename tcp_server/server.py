@@ -12,7 +12,7 @@ PORT = 65432      # Port to listen on
 connected_devices = {}
 client_connections = {}  # Map device_id to client_socket for disconnect control
 backend_url = os.getenv("REACT_APP_API_BASE_URL")
-server_running = True  # Flag to control server operation
+
 # Redis client
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
 
@@ -41,7 +41,13 @@ def send_file(client_socket, image_path):
 
 
 def start_server(host, port):
-    global server_running
+    server_running = r.get("tcp_server:status", "running") == "running"
+    while not server_running:
+        print("[+] TCP Server STOPPED By Admin System...")
+        time.sleep(10)
+        server_running = r.get("tcp_server:status", "running") == "running"
+
+    print("[+] TCP Server is RUNNING...")
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((host, port))
@@ -50,29 +56,26 @@ def start_server(host, port):
     print(f"Listening on {host}:{port}")
     
     # Set server status to running in Redis
-    r.set("tcp_server:status", "running")
-
-    while server_running:
-        # Check if server should stop
-        server_status = r.get("tcp_server:status")
-        if server_status == "stopped":
-            print("[!] Server stop command received")
-            server_running = False
-            break
+    while True:
+        if server_running:
+            try:
+                client_socket, addr = server_socket.accept()
+                client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
+                client_handler.start()
+            except socket.timeout:
+                # Normal timeout, continue loop to check status
+                continue
+            except Exception as e:
+                print(f"[!] Error accepting connection: {e}")
             
-        try:
-            client_socket, addr = server_socket.accept()
-            client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
-            client_handler.start()
-        except socket.timeout:
-            # Normal timeout, continue loop to check status
-            continue
-        except Exception as e:
-            print(f"[!] Error accepting connection: {e}")
-    
-    print("[+] Server shutting down...")
-    server_socket.close()
-    r.set("tcp_server:status", "stopped")
+        server_running = r.get("tcp_server:status") == "running"
+        server_stopped = r.get("tcp_server:status") == "stopped"
+        if server_stopped:
+            print("[+] Server shutting down...")
+            server_socket.close()
+            time.sleep(2)
+            return
+        time.sleep(0.5)
 
 
 def register_device(device_info, addr, client_socket):
@@ -194,11 +197,9 @@ def cleanup_device(device_id, num_nodes):
 
 
 def handle_client(client_socket, addr):
-    global server_running
     print(f"Accepted connection from {addr}")
-    
     # Check if server is stopping
-    if not server_running or r.get("tcp_server:status") == "stopped":
+    if r.get("tcp_server:status") == "stopped":
         print(f"[!] Server stopping, rejecting connection from {addr}")
         client_socket.close()
         return
