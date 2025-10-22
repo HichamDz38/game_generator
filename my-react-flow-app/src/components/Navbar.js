@@ -27,7 +27,7 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning })
   return (
     <>
       <nav className={styles.navbar}>
-        <p className={styles.left}>ERPanel</p>
+        <p className={styles.left}>Raven Cube Project</p>
         <ul className={styles.links}>
           <a 
             href="/home" 
@@ -57,9 +57,7 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning })
             DEVICES
             {isFlowRunning && " (Disabled during execution)"}
           </a>
-          <a href="/sound">SOUND</a>
           <a href="/settings">SETTINGS</a>
-          <a href="/exit">EXIT</a>
         </ul>
       </nav>
     </>
