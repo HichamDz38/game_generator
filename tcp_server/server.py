@@ -9,7 +9,8 @@ import errno
 
 HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 65432      # Port to listen on
-connected_devices = {}
+connected_devices = {}  # Logical devices (game nodes)
+connected_physical_devices = {}  # Physical devices (monitors)
 client_connections = {}  # Map device_id to client_socket for disconnect control
 backend_url = os.getenv("REACT_APP_API_BASE_URL")
 
@@ -79,11 +80,16 @@ def start_server(host, port):
 
 
 def register_device(device_info, addr, client_socket):
-    """Register device and return device_id, num_nodes"""
-    num_nodes = device_info.get("num_nodes", 1)
-    device_name = device_info.get("device_name", "")
-    device_id = f"{addr[0]}:{device_name}"
-    
+    """Register device and return device_id, num_nodes, is_physical"""
+    device_type = device_info.get("type", "logical")  # "logical" (default) or "physical"
+    is_physical = (device_type == "physical")
+    if is_physical:
+        device_id = f"{addr[0]}"
+        num_nodes = 1  # Physical devices are always single-node
+    else:
+        device_name = device_info.get("device_name", "")
+        device_id = f"{addr[0]}:{device_name}"
+        num_nodes = device_info.get("num_nodes", 1)
     # Store socket connection for disconnect control
     client_connections[device_id] = client_socket
     
@@ -94,9 +100,12 @@ def register_device(device_info, addr, client_socket):
             update_device_info(device_id+f"_{i+1}", instance_device_info)
             client_connections[f"{device_id}_{i+1}"] = client_socket
     else:
-        update_device_info(device_id, device_info)
+        if is_physical:
+            update_physical_device_info(device_id, device_info)
+        else:
+            update_device_info(device_id, device_info)
     
-    return device_id, num_nodes
+    return device_id, num_nodes, is_physical
 
 
 def get_command_for_device(device_id, num_nodes, index):
@@ -225,12 +234,66 @@ def handle_client(client_socket, addr):
     
     try:
         device_info = json.loads(client_socket.recv(4096).decode('utf-8'))
-        device_id, num_nodes = register_device(device_info, addr, client_socket)
+        device_id, num_nodes, is_physical = register_device(device_info, addr, client_socket)
     except Exception as e:
         print(f"[!] Error receiving initial device info: {e}")
         client_socket.close()
         return
 
+    # Physical devices: just wait for direct commands (no queue polling, no disconnect)
+    if is_physical:
+        print(f"[+] Physical device {device_id} connected - waiting for direct commands")
+        while True:
+            # Check if server is stopping
+            if r.get("tcp_server:status") == "stopped":
+                print(f"[!] Server stopping, disconnecting physical device {device_id}")
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
+            
+            # Check for physical device commands in Redis
+            command_key = f"{device_id}:physical_command"
+            command_json = r.get(command_key)
+            if command_json:
+                try:
+                    # Delete command immediately to avoid re-processing
+                    r.delete(command_key)
+                    
+                    command_data = json.loads(command_json)
+                    print(f"[+] Sending command to physical device {device_id}: {command_data.get('action')}")
+                    
+                    # Send command to device
+                    client_socket.sendall(command_json.encode("utf-8"))
+                    
+                    # Wait for response (with timeout)
+                    client_socket.settimeout(30.0)
+                    response_data = client_socket.recv(4096).decode('utf-8')
+                    client_socket.settimeout(None)
+                    
+                    if response_data:
+                        response = json.loads(response_data)
+                        # Store response in Redis for Flask to retrieve
+                        response_key = f"{device_id}:physical_response"
+                        r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
+                        print(f"[+] Physical device response: {response.get('status')}")
+                    else:
+                        print(f"[!] No response from physical device {device_id}")
+                        
+                except socket.timeout:
+                    print(f"[!] Timeout waiting for response from {device_id}")
+                    error_response = {"status": "failed", "message": "Timeout"}
+                    r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+                except Exception as e:
+                    print(f"[!] Error processing physical command: {e}")
+                    error_response = {"status": "failed", "message": str(e)}
+                    r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+            
+            # Physical devices: no disconnect command, no queue polling
+            # They stay connected until server stops or connection dies
+            time.sleep(0.2)  # Check for commands more frequently
+        return
+
+    # Logical devices: poll command queue (existing logic)
     index = 0
     
     while True:
@@ -307,23 +370,78 @@ def get_device_command(device_id):
     return r.lpop(f"{device_id}:commands")
 
 
+def send_direct_command_to_physical_device(device_id, command_data):
+    """
+    Send a direct command to a physical device (monitors) without using queue.
+    Returns: (success: bool, message: str, response_data: dict)
+    """
+    if device_id not in client_connections:
+        return False, f"Physical device {device_id} not connected", None
+    
+    client_socket = client_connections[device_id]
+    
+    try:
+        # Send command directly
+        command_json = json.dumps(command_data)
+        client_socket.sendall(command_json.encode("utf-8"))
+        
+        # Wait for response (with timeout)
+        client_socket.settimeout(30.0)  # 30 second timeout for physical operations
+        response_data = client_socket.recv(4096).decode('utf-8')
+        client_socket.settimeout(None)  # Reset to no timeout
+        
+        if not response_data:
+            return False, "No response from device", None
+        
+        response = json.loads(response_data)
+        
+        if response.get("status") == "success":
+            return True, response.get("message", "Success"), response.get("data")
+        else:
+            return False, response.get("message", "Failed"), response.get("data")
+            
+    except socket.timeout:
+        return False, "Command timeout (30s)", None
+    except Exception as e:
+        return False, f"Error: {str(e)}", None
+
+
 def update_device_info(device_id, device_info):
     """
-    Update the device information in the connected_devices dictionary.
+    Update the device information in the connected_devices dictionary (logical devices).
     """
     connected_devices[device_id] = device_info
     print(f"Updated device info: {connected_devices}")
     r.set(name="connected_devices", value=json.dumps(connected_devices))
 
 
+def update_physical_device_info(device_id, device_info):
+    """
+    Update the physical device information (monitors - separate namespace).
+    """
+    connected_physical_devices[device_id] = device_info
+    print(f"Updated physical device info: {device_id}")
+    r.set(name="connected_physical_devices", value=json.dumps(connected_physical_devices))
+
+
 def remove_device(device_id):
     """
-    Remove the device from the connected_devices dictionary and Redis.
+    Remove the device from connected_devices or connected_physical_devices and Redis.
     """
+    # Try logical devices first
     if device_id in connected_devices:
         del connected_devices[device_id]
         r.set(name="connected_devices", value=json.dumps(connected_devices))
-        print(f"Removed device {device_id} from connected devices.")
+        r.delete(f"{device_id}:commands")
+        r.delete(f"{device_id}:status")
+        r.delete(f"{device_id}:current_config")
+        print(f"Removed logical device {device_id}")
+    # Try physical devices
+    elif device_id in connected_physical_devices:
+        del connected_physical_devices[device_id]
+        r.set(name="connected_physical_devices", value=json.dumps(connected_physical_devices))
+        # Physical devices don't have commands/status queues
+        print(f"Removed physical device {device_id}")
     else:
         print(f"Device {device_id} not found in connected devices.")
 

@@ -4,6 +4,7 @@ import DnDFlow from "./DragDrop/DnDFlow";
 import Navbar from "./components/Navbar";
 import Scenariopage from "./components/Scenariopage";
 import DevicesPage from "./components/DevicesPage";
+import DevicesBeta from "./components/DevicesBeta";
 import { Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 
 function FlowEditorWrapper({ onFlowRunningChange }) {
@@ -49,11 +50,18 @@ export default function App() {
     }
   };
 
+  const handleNavigateToDevicesBeta = () => {
+    if (!isFlowRunning) {
+      navigate("/devices-beta");
+    }
+  };
+
   return (
     <div className="app">
       <Navbar
         onReturnScenarioSelect={handleReturnScenarioSelect}
         onNavigateToDevices={handleNavigateToDevices}
+        onNavigateToDevicesBeta={handleNavigateToDevicesBeta}
         isFlowRunning={isFlowRunning}
       />
       <div style={{ display: "flex", flex: 1 }}>
@@ -72,6 +80,10 @@ export default function App() {
           <Route
             path="/devices"
             element={<DevicesPage />}
+          />
+          <Route
+            path="/devices-beta"
+            element={<DevicesBeta />}
           />
           <Route
             path="/flow/:scenarioName?"

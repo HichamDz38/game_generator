@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './MyComponent.module.css';
 
-function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning }) {
+function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevicesBeta, isFlowRunning }) {
   const handleReturnScenarioClick = (e) => {
     if (isFlowRunning) {
       e.preventDefault();
@@ -21,6 +21,17 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning })
     
     if (onNavigateToDevices) {
       onNavigateToDevices();
+    }
+  };
+
+  const handleDevicesBetaClick = (e) => {
+    e.preventDefault();
+    if (isFlowRunning) {
+      return;
+    }
+    
+    if (onNavigateToDevicesBeta) {
+      onNavigateToDevicesBeta();
     }
   };
 
@@ -56,6 +67,23 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, isFlowRunning })
           >
             DEVICES
             {isFlowRunning && " (Disabled during execution)"}
+          </a>
+          <a 
+            href="/devices-beta"
+            onClick={handleDevicesBetaClick}
+            className={isFlowRunning ? styles.disabled : ''}
+            style={{
+              cursor: isFlowRunning ? 'not-allowed' : 'pointer',
+              opacity: isFlowRunning ? 0.5 : 1,
+              pointerEvents: isFlowRunning ? 'none' : 'auto',
+              background: '#ff9800',
+              padding: '5px 10px',
+              borderRadius: '5px'
+            }}
+            title={isFlowRunning ? "Cannot navigate while flow is running" : "Physical devices monitor (Beta)"}
+          >
+            DEVICES BETA 🔥
+            {isFlowRunning && " (Disabled)"}
           </a>
           <a href="/settings">SETTINGS</a>
         </ul>

@@ -640,6 +640,162 @@ def disconnect_all_devices():
         }), 500
 
 
+# ============================================================
+# PHYSICAL DEVICE ENDPOINTS (Monitor Devices)
+# ============================================================
+
+def send_physical_device_command(device_id, command_data, timeout=30):
+    """
+    Send command to physical device via Redis and wait for response
+    """
+    import time
+    
+    # Check if device is connected
+    devices_json = redis_client.get("connected_physical_devices")
+    if not devices_json or device_id not in json.loads(devices_json):
+        return False, f"Physical device {device_id} not connected", None
+    
+    # Send command via Redis
+    command_key = f"{device_id}:physical_command"
+    response_key = f"{device_id}:physical_response"
+    
+    # Clear any old response
+    redis_client.delete(response_key)
+    
+    # Send command
+    redis_client.set(command_key, json.dumps(command_data))
+    
+    # Wait for response (poll Redis)
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        response_json = redis_client.get(response_key)
+        if response_json:
+            redis_client.delete(response_key)  # Clean up
+            response = json.loads(response_json)
+            
+            if response.get("status") == "success":
+                return True, response.get("message", "Success"), response.get("data")
+            else:
+                return False, response.get("message", "Failed"), response.get("data")
+        
+        time.sleep(0.1)  # Poll every 100ms
+    
+    # Timeout - clean up command
+    redis_client.delete(command_key)
+    return False, f"Command timeout ({timeout}s)", None
+
+
+@app.route('/api/physical-devices', methods=['GET'])
+def get_physical_devices():
+    """Get all connected physical devices"""
+    try:
+        devices_json = redis_client.get("connected_physical_devices")
+        if devices_json:
+            devices = json.loads(devices_json)
+            return jsonify(devices), 200
+        return jsonify({}), 200
+    except Exception as e:
+        logger.error(f"Error getting physical devices: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/physical-devices/<device_id>/metrics', methods=['POST'])
+def get_physical_device_metrics(device_id):
+    """Get system metrics from a physical device"""
+    try:
+        command = {
+            "action": "get_metrics", 
+            "params": {}
+        }
+        success, message, data = send_physical_device_command(device_id, command)
+        
+        if success:
+            return jsonify({"status": "success", "data": data}), 200
+        else:
+            return jsonify({"status": "error", "message": message}), 500
+    except Exception as e:
+        logger.error(f"Error getting metrics: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/physical-devices/<device_id>/client-devices', methods=['POST'])
+def get_client_devices_on_pi(device_id):
+    """Get list of client device services running on this Pi"""
+    try:
+        command = {
+            "action": "list_devices", 
+            "params": {}
+        }
+        success, message, data = send_physical_device_command(device_id, command)
+        
+        if success:
+            return jsonify({"status": "success", "devices": data}), 200
+        else:
+            return jsonify({"status": "error", "message": message}), 500
+    except Exception as e:
+        logger.error(f"Error listing client devices: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/physical-devices/<device_id>/restart-pi', methods=['POST'])
+def restart_raspberry_pi(device_id):
+    """Restart the entire Raspberry Pi"""
+    try:
+        data = request.get_json()
+        confirm = data.get('confirm', False)
+        
+        if not confirm:
+            return jsonify({"status": "error", "message": "confirm: true required"}), 400
+        
+        command = {
+            "action": "restart_pi", 
+            "params": {"confirm": True}
+        }
+        success, message, response_data = send_physical_device_command(device_id, command)
+        
+        return jsonify({"status": "success" if success else "error", "message": message}), 200 if success else 500
+    except Exception as e:
+        logger.error(f"Error restarting Pi: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/physical-devices/<device_id>/service/<action>', methods=['POST'])
+def control_client_service(device_id, action):
+    """Control a client service: restart, stop, start"""
+    try:
+        data = request.get_json()
+        service_name = data.get('service_name')
+        
+        if not service_name:
+            return jsonify({"status": "error", "message": "service_name required"}), 400
+        
+        # Map action to command
+        if action == "restart":
+            command = {
+                "action": "restart_device", 
+                "params": {"device_service": service_name}
+            }
+        elif action == "stop":
+            command = {
+                "action": "stop_device", 
+                "params": {"device_service": service_name}
+            }
+        elif action == "start":
+            command = {
+                "action": "start_device", 
+                "params": {"device_service": service_name}
+            }
+        else:
+            return jsonify({"status": "error", "message": "Invalid action"}), 400
+        
+        success, message, response = send_physical_device_command(device_id, command)
+        
+        return jsonify({"status": "success" if success else "error", "message": message}), 200 if success else 500
+    except Exception as e:
+        logger.error(f"Error controlling service: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
