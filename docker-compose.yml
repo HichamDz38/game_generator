@@ -4,6 +4,9 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
   gamepanel:
     build:
@@ -47,3 +50,7 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
