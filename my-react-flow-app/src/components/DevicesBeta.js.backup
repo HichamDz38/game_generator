@@ -134,8 +134,8 @@ const DevicesBeta = () => {
       
       if (response.data.status === 'success') {
         alert(`✓ ${actionText} successful: ${response.data.message}`);
-        // Refresh all data to update service status
-        await fetchAllDeviceData();
+        // Refresh services list
+        await fetchDeviceServices(deviceId);
       } else {
         alert(`✗ ${actionText} failed: ${response.data.message}`);
       }
@@ -213,8 +213,7 @@ const DevicesBeta = () => {
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center',
-                width: '100%',
-                marginBottom: '20px'
+                width: '100%'
               }}>
                 <div style={{ flex: 1 }}>
                   <div className={styles.name_scenario} style={{ fontSize: '20px' }}>
@@ -234,6 +233,13 @@ const DevicesBeta = () => {
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button 
+                    className={styles.theme__button}
+                    onClick={() => toggleDevice(deviceId)}
+                    style={{ fontSize: '16px', padding: '10px 25px' }}
+                  >
+                    {isExpanded ? '▲ COLLAPSE' : '▼ EXPAND'}
+                  </button>
+                  <button 
                     className={styles.delete}
                     onClick={() => handleRestartPi(deviceId)}
                     disabled={loading}
@@ -244,126 +250,107 @@ const DevicesBeta = () => {
                 </div>
               </div>
 
-              {/* System Metrics - ALWAYS VISIBLE */}
-              {metrics ? (
-                <div style={{ marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '18px', marginBottom: '15px', color: '#333' }}>
-                    📊 System Metrics
-                  </h3>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '15px'
-                  }}>
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.cpu_percent)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>CPU Usage</div>
-                      <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.cpu_percent) 
-                      }}>
-                        {metrics.cpu_percent.toFixed(1)}%
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.temperature, { warning: 65, danger: 75 })}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Temperature</div>
-                      <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.temperature, { warning: 65, danger: 75 }) 
-                      }}>
-                        {metrics.temperature.toFixed(1)}°C
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.memory_percent)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Memory</div>
-                      <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.memory_percent) 
-                      }}>
-                        {metrics.memory_percent.toFixed(1)}%
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                        {formatBytes(metrics.memory_used)} / {formatBytes(metrics.memory_total)}
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.disk_usage)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Disk Usage</div>
-                      <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.disk_usage) 
-                      }}>
-                        {metrics.disk_usage.toFixed(1)}%
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                        {formatBytes(metrics.disk_used)} / {formatBytes(metrics.disk_total)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              {/* Expanded Content */}
+              {isExpanded && (
                 <div style={{ 
-                  textAlign: 'center', 
-                  padding: '20px', 
-                  marginBottom: '20px',
-                  color: '#999',
-                  background: '#f9f9f9',
-                  borderRadius: '8px'
+                  marginTop: '20px', 
+                  paddingTop: '20px', 
+                  borderTop: '2px solid #e0e0e0' 
                 }}>
-                  {deviceData.error ? `Error: ${deviceData.error}` : 'Loading metrics...'}
-                </div>
-              )}
+                  {/* System Metrics */}
+                  {metrics ? (
+                    <div style={{ marginBottom: '20px' }}>
+                      <h3 style={{ fontSize: '18px', marginBottom: '15px', color: '#333' }}>
+                        📊 System Metrics
+                      </h3>
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '15px'
+                      }}>
+                        <div style={{ 
+                          padding: '15px', 
+                          background: '#f5f5f5', 
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${getMetricColor(metrics.cpu_percent)}`
+                        }}>
+                          <div style={{ fontSize: '14px', color: '#666' }}>CPU Usage</div>
+                          <div style={{ 
+                            fontSize: '24px', 
+                            fontWeight: 'bold', 
+                            color: getMetricColor(metrics.cpu_percent) 
+                          }}>
+                            {metrics.cpu_percent.toFixed(1)}%
+                          </div>
+                        </div>
 
-              {/* Client Services - TOGGLE VISIBILITY */}
-              <div style={{
-                borderTop: '2px solid #e0e0e0',
-                paddingTop: '20px'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: '15px'
-                }}>
-                  <h3 style={{ fontSize: '18px', color: '#333', margin: 0 }}>
-                    🔌 Client Services ({services.length})
-                  </h3>
-                  <button 
-                    className={styles.theme__button}
-                    onClick={() => toggleDevice(deviceId)}
-                    style={{ fontSize: '14px', padding: '8px 20px' }}
-                  >
-                    {isExpanded ? '▲ HIDE SERVICES' : '▼ SHOW SERVICES'}
-                  </button>
-                </div>
+                        <div style={{ 
+                          padding: '15px', 
+                          background: '#f5f5f5', 
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${getMetricColor(metrics.temperature, { warning: 65, danger: 75 })}`
+                        }}>
+                          <div style={{ fontSize: '14px', color: '#666' }}>Temperature</div>
+                          <div style={{ 
+                            fontSize: '24px', 
+                            fontWeight: 'bold', 
+                            color: getMetricColor(metrics.temperature, { warning: 65, danger: 75 }) 
+                          }}>
+                            {metrics.temperature.toFixed(1)}°C
+                          </div>
+                        </div>
 
-                {isExpanded && (
+                        <div style={{ 
+                          padding: '15px', 
+                          background: '#f5f5f5', 
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${getMetricColor(metrics.memory_percent)}`
+                        }}>
+                          <div style={{ fontSize: '14px', color: '#666' }}>Memory</div>
+                          <div style={{ 
+                            fontSize: '24px', 
+                            fontWeight: 'bold', 
+                            color: getMetricColor(metrics.memory_percent) 
+                          }}>
+                            {metrics.memory_percent.toFixed(1)}%
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                            {formatBytes(metrics.memory_used)} / {formatBytes(metrics.memory_total)}
+                          </div>
+                        </div>
+
+                        <div style={{ 
+                          padding: '15px', 
+                          background: '#f5f5f5', 
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${getMetricColor(metrics.disk_usage)}`
+                        }}>
+                          <div style={{ fontSize: '14px', color: '#666' }}>Disk Usage</div>
+                          <div style={{ 
+                            fontSize: '24px', 
+                            fontWeight: 'bold', 
+                            color: getMetricColor(metrics.disk_usage) 
+                          }}>
+                            {metrics.disk_usage.toFixed(1)}%
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                            {formatBytes(metrics.disk_used)} / {formatBytes(metrics.disk_total)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                      Loading metrics...
+                    </div>
+                  )}
+
+                  {/* Client Services */}
                   <div>
+                    <h3 style={{ fontSize: '18px', marginBottom: '15px', color: '#333' }}>
+                      🔌 Client Services ({services.length})
+                    </h3>
+                    
                     {services.length === 0 ? (
                       <div style={{ 
                         textAlign: 'center', 
@@ -419,7 +406,7 @@ const DevicesBeta = () => {
                                   backgroundColor: '#4caf50'
                                 }}
                               >
-                                ▶️ START
+                                ▶️ Start
                               </button>
                               <button
                                 className={styles.theme__button}
@@ -431,7 +418,7 @@ const DevicesBeta = () => {
                                   backgroundColor: '#f44336'
                                 }}
                               >
-                                ⏹️ STOP
+                                ⏹️ Stop
                               </button>
                               <button
                                 className={styles.theme__button}
@@ -443,7 +430,7 @@ const DevicesBeta = () => {
                                   backgroundColor: '#ff9800'
                                 }}
                               >
-                                🔄 RESTART
+                                🔄 Restart
                               </button>
                             </div>
                           </div>
@@ -451,8 +438,8 @@ const DevicesBeta = () => {
                       </div>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           );
         })

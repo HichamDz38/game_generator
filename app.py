@@ -222,29 +222,52 @@ def finish(device_id):
 @app.route('/stop/<device_id>', methods=['POST'])
 def stop_device(device_id):
     """
-    Send stop/cancel command to a device (queues command, device will confirm with status update)
+    Stop a specific client device by restarting its service on the physical device.
+    This ensures the device stops immediately, even if it's busy executing commands.
+    
+    Device ID format: "IP:device_name" (e.g., "192.168.16.195:epaper")
+    Service name format: "Client_Device_{device_name}.service"
     """
     try:
-        data = request.get_json() or {}
-        node_id = data.get('nodeId')
+        logger.info(f"Stopping device {device_id} via service restart...")
         
-        logger.info(f"Sending stop command to device {device_id} (node: {node_id})")
+        # Parse device_id format: "IP:device_name"
+        if ':' not in device_id:
+            return jsonify({
+                'status': 'error',
+                'message': f'Invalid device_id format: {device_id}. Expected "IP:device_name"'
+            }), 400
         
-        # Queue the stop command - device will process it and update status
-        command_data = {
-            'command': 'stop',
-            'node_id': node_id
+        physical_ip, device_name = device_id.split(':', 1)
+        service_name = f"Client_Device_{device_name}.service"
+        
+        # Send restart command to physical device
+        command = {
+            "action": "restart_device",
+            "params": {"device_service": service_name}
         }
-        redis_client.lpush(f'{device_id}:commands', json.dumps(command_data))
         
-        logger.info(f"Stop command queued for device {device_id}")
+        success, message, _ = send_physical_device_command(
+            physical_ip, 
+            command, 
+            timeout=10
+        )
         
-        return jsonify({
-            'status': 'success',
-            'message': f'Stop command sent to device {device_id}',
-            'deviceId': device_id,
-            'nodeId': node_id
-        }), 200
+        if success:
+            logger.info(f"✓ Successfully restarted {service_name} on {physical_ip}")
+            return jsonify({
+                'status': 'success',
+                'message': f'Device {device_id} stopped successfully',
+                'deviceId': device_id,
+                'service': service_name
+            }), 200
+        else:
+            logger.error(f"✗ Failed to restart {service_name}: {message}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to stop device: {message}',
+                'deviceId': device_id
+            }), 500
         
     except Exception as e:
         logger.error(f"Error stopping device {device_id}: {str(e)}")
@@ -279,11 +302,16 @@ def reset_all():
 @app.route('/stop_all', methods=['POST'])
 def stop_all():
     """
-    Broadcast stop command to all connected devices via Redis
-    All devices will receive and process the stop command in parallel
+    Stop all connected client devices by restarting their services on physical devices.
+    Waits for all devices to reconnect (max 2 minutes timeout).
+    
+    Device ID format: "IP:device_name" (e.g., "192.168.16.195:epaper")
+    Service name format: "Client_Device_{device_name}.service"
     """
+    import time
+    
     try:
-        logger.info("Broadcasting stop command to all connected devices...")
+        logger.info("Stopping all client devices via service restart...")
         
         connected_dev = redis_client.get("connected_devices")
         if not connected_dev:
@@ -295,28 +323,137 @@ def stop_all():
             }), 200
         
         devices = json.loads(connected_dev.replace("'", '"'))
-        device_count = 0
+        original_device_ids = set(devices.keys())
         
-        # Send stop command to all devices via Redis
+        # Group devices by physical device (IP)
+        physical_devices_map = {}
         for device_id in devices.keys():
-            command_data = {
-                'command': 'stop',
-                'node_id': None
-            }
-            redis_client.lpush(f'{device_id}:commands', json.dumps(command_data))
-            device_count += 1
-            logger.info(f"Stop command queued for device: {device_id}")
+            try:
+                # Parse device_id format: "IP:device_name"
+                if ':' not in device_id:
+                    logger.warning(f"Skipping malformed device_id: {device_id}")
+                    continue
+                
+                ip, device_name = device_id.split(':', 1)
+                
+                if ip not in physical_devices_map:
+                    physical_devices_map[ip] = []
+                
+                physical_devices_map[ip].append({
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'service_name': f"Client_Device_{device_name}.service"
+                })
+                
+            except Exception as e:
+                logger.error(f"Error parsing device_id {device_id}: {str(e)}")
+                continue
         
-        logger.info(f"Stop command broadcasted to {device_count} devices")
+        # Restart services on each physical device
+        restart_success_count = 0
+        restart_failed_count = 0
+        restart_results = []
         
-        return jsonify({
-            'status': 'success',
-            'message': f'Stop command sent to {device_count} devices',
-            'devices_stopped': device_count
-        }), 200
+        for physical_ip, client_devices in physical_devices_map.items():
+            logger.info(f"Stopping {len(client_devices)} client(s) on physical device {physical_ip}")
+            
+            for client in client_devices:
+                try:
+                    # Send restart command to physical device
+                    command = {
+                        "action": "restart_device",
+                        "params": {"device_service": client['service_name']}
+                    }
+                    
+                    success, message, _ = send_physical_device_command(
+                        physical_ip, 
+                        command, 
+                        timeout=10
+                    )
+                    
+                    if success:
+                        logger.info(f"✓ Restarted service: {client['service_name']} on {physical_ip}")
+                        restart_success_count += 1
+                        restart_results.append({
+                            'device_id': client['device_id'],
+                            'restart_status': 'success',
+                            'message': message
+                        })
+                    else:
+                        logger.error(f"✗ Failed to restart {client['service_name']}: {message}")
+                        restart_failed_count += 1
+                        restart_results.append({
+                            'device_id': client['device_id'],
+                            'restart_status': 'failed',
+                            'message': message
+                        })
+                        
+                except Exception as e:
+                    logger.error(f"Error restarting {client['device_id']}: {str(e)}")
+                    restart_failed_count += 1
+                    restart_results.append({
+                        'device_id': client['device_id'],
+                        'restart_status': 'error',
+                        'message': str(e)
+                    })
+        
+        logger.info(f"Services restart complete: {restart_success_count} successful, {restart_failed_count} failed")
+        
+        # Now wait for devices to reconnect (2 minute timeout)
+        logger.info(f"Waiting for {len(original_device_ids)} devices to reconnect (timeout: 120s)...")
+        
+        RECONNECT_TIMEOUT = 120  # 2 minutes
+        CHECK_INTERVAL = 2  # Check every 2 seconds
+        start_time = time.time()
+        
+        reconnected_devices = set()
+        while time.time() - start_time < RECONNECT_TIMEOUT:
+            # Check which devices are now connected
+            current_connected = redis_client.get("connected_devices")
+            if current_connected:
+                current_devices = json.loads(current_connected.replace("'", '"'))
+                reconnected_devices = set(current_devices.keys()) & original_device_ids
+                
+                if reconnected_devices == original_device_ids:
+                    elapsed = time.time() - start_time
+                    logger.info(f"✓ All {len(original_device_ids)} devices reconnected in {elapsed:.1f}s")
+                    break
+                
+                logger.info(f"Reconnected: {len(reconnected_devices)}/{len(original_device_ids)} devices...")
+            
+            time.sleep(CHECK_INTERVAL)
+        
+        # Check final status
+        elapsed_time = time.time() - start_time
+        missing_devices = original_device_ids - reconnected_devices
+        
+        if len(missing_devices) == 0:
+            logger.info(f"✓ SUCCESS: All devices reconnected in {elapsed_time:.1f}s")
+            return jsonify({
+                'status': 'success',
+                'message': f'All {len(original_device_ids)} devices stopped and reconnected',
+                'devices_restarted': restart_success_count,
+                'devices_reconnected': len(reconnected_devices),
+                'reconnect_time': round(elapsed_time, 1),
+                'details': restart_results
+            }), 200
+        else:
+            logger.warning(f"⚠ TIMEOUT: {len(missing_devices)} devices failed to reconnect after {elapsed_time:.1f}s")
+            logger.warning(f"Missing devices: {missing_devices}")
+            
+            return jsonify({
+                'status': 'timeout',
+                'message': f'{len(reconnected_devices)}/{len(original_device_ids)} devices reconnected. {len(missing_devices)} failed.',
+                'devices_restarted': restart_success_count,
+                'devices_reconnected': len(reconnected_devices),
+                'devices_missing': len(missing_devices),
+                'missing_device_ids': list(missing_devices),
+                'reconnect_time': round(elapsed_time, 1),
+                'details': restart_results
+            }), 200
         
     except Exception as e:
-        logger.error(f"Error broadcasting stop to all devices: {str(e)}")
+        logger.error(f"Error stopping all devices: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': f'Failed to stop all devices: {str(e)}'

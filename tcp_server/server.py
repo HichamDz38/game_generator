@@ -261,6 +261,7 @@ def handle_client(client_socket, addr):
                     
                     command_data = json.loads(command_json)
                     print(f"[+] Sending command to physical device {device_id}: {command_data.get('action')}")
+                    print(f"[+] Full command: {command_json}")
                     
                     # Send command to device
                     client_socket.sendall(command_json.encode("utf-8"))
@@ -275,9 +276,11 @@ def handle_client(client_socket, addr):
                         # Store response in Redis for Flask to retrieve
                         response_key = f"{device_id}:physical_response"
                         r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
-                        print(f"[+] Physical device response: {response.get('status')}")
+                        print(f"[+] Physical device response: {response.get('status')} - {response.get('message')}")
                     else:
                         print(f"[!] No response from physical device {device_id}")
+                        error_response = {"status": "failed", "message": "No response from device"}
+                        r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
                         
                 except socket.timeout:
                     print(f"[!] Timeout waiting for response from {device_id}")
@@ -285,6 +288,8 @@ def handle_client(client_socket, addr):
                     r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
                 except Exception as e:
                     print(f"[!] Error processing physical command: {e}")
+                    import traceback
+                    traceback.print_exc()
                     error_response = {"status": "failed", "message": str(e)}
                     r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
             

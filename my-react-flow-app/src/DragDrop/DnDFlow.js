@@ -774,24 +774,105 @@ const stopAllActiveExecutions = useCallback(async (excludePaths = []) => {
 
 // Function to stop/clear all connected devices via backend broadcast
 const stopAllDevices = useCallback(async () => {
-  console.log('Broadcasting stop command to all connected devices...');
+  console.log('⏹️ Stopping all devices (restarting services, waiting for reconnection)...');
   
   try {
+    // Show loading indicator
+    const loadingToast = document.createElement('div');
+    loadingToast.id = 'stop-all-loading';
+    loadingToast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ff9800;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    `;
+    loadingToast.innerHTML = `
+      <div style="width: 30px; height: 30px; border: 4px solid white; border-top-color: transparent; 
+                  border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <div>
+        <div>⏹️ Stopping all devices...</div>
+        <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">Restarting services & waiting for reconnection (up to 2 min)</div>
+      </div>
+    `;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+    document.body.appendChild(loadingToast);
+    
     const response = await fetch(`${API_BASE_URL}/stop_all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
     
+    // Remove loading toast
+    const toast = document.getElementById('stop-all-loading');
+    if (toast) toast.remove();
+    
     if (!response.ok) {
-      console.error('Failed to broadcast stop command to devices');
+      console.error('❌ Failed to stop devices');
+      alert('❌ Failed to stop devices. Check console for details.');
       return;
     }
     
     const result = await response.json();
-    console.log(`Stop command broadcasted: ${result.message}`);
+    console.log('Stop all result:', result);
+    
+    if (result.status === 'success') {
+      console.log(`✅ ${result.message}`);
+      console.log(`   📊 ${result.devices_reconnected} devices reconnected in ${result.reconnect_time}s`);
+      
+      // Show success notification briefly
+      const successToast = document.createElement('div');
+      successToast.style.cssText = loadingToast.style.cssText.replace('#ff9800', '#4caf50');
+      successToast.innerHTML = `
+        <div style="font-size: 24px;">✅</div>
+        <div>
+          <div>${result.message}</div>
+          <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">
+            Reconnected in ${result.reconnect_time}s
+          </div>
+        </div>
+      `;
+      document.body.appendChild(successToast);
+      setTimeout(() => successToast.remove(), 3000);
+      
+    } else if (result.status === 'timeout') {
+      console.warn(`⚠️ ${result.message}`);
+      console.warn(`   📊 ${result.devices_reconnected}/${result.devices_reconnected + result.devices_missing} devices reconnected`);
+      console.warn(`   ❌ Missing devices:`, result.missing_device_ids);
+      
+      alert(
+        `⚠️ WARNING: Some devices failed to reconnect!\n\n` +
+        `Reconnected: ${result.devices_reconnected}\n` +
+        `Missing: ${result.devices_missing}\n\n` +
+        `Failed devices:\n${result.missing_device_ids.join('\n')}\n\n` +
+        `Time elapsed: ${result.reconnect_time}s`
+      );
+      
+    } else {
+      console.error('❌ Unexpected status:', result.status);
+      alert(`❌ Error: ${result.message}`);
+    }
     
   } catch (error) {
-    console.error('Error broadcasting stop to all devices:', error);
+    // Remove loading toast if still present
+    const toast = document.getElementById('stop-all-loading');
+    if (toast) toast.remove();
+    
+    console.error('❌ Error stopping devices:', error);
+    alert(`❌ Error stopping devices: ${error.message}`);
   }
 }, []);
 

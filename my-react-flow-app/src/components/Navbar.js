@@ -77,8 +77,6 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevi
               opacity: isFlowRunning ? 0.5 : 1,
               pointerEvents: isFlowRunning ? 'none' : 'auto',
               background: '#ff9800',
-              padding: '5px 10px',
-              borderRadius: '5px'
             }}
             title={isFlowRunning ? "Cannot navigate while flow is running" : "Physical devices monitor (Beta)"}
           >
