@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Flask API
+  - job_name: 'flask_api'
+    static_configs:
+      - targets: ['gamepanel:5000']
+    metrics_path: '/metrics'
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # TCP Server (if you add metrics endpoint)
+  - job_name: 'tcp_server'
+    static_configs:
+      - targets: ['tcp_server:65432']

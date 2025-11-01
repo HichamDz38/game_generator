@@ -11,61 +11,24 @@ const DevicesBeta = () => {
 
   const fetchAllDeviceData = async () => {
     try {
-      console.log('Fetching all physical devices with full data...');
-      const devicesResponse = await axios.get(`${API_BASE_URL}/api/physical-devices`);
+      console.log('Fetching all physical devices with full data (single API call)...');
+      const response = await axios.get(`${API_BASE_URL}/api/physical-devices`);
       
-      if (!devicesResponse.data) {
+      if (!response.data) {
         console.log('No physical devices found');
+        setPhysicalDevices({});
         return;
       }
 
-      const devices = devicesResponse.data;
-      console.log('Found devices:', Object.keys(devices));
-
-      // Fetch metrics and services for each device in parallel
-      const deviceIds = Object.keys(devices);
-      const dataPromises = deviceIds.map(async (deviceId) => {
-        try {
-          const [metricsRes, servicesRes] = await Promise.all([
-            axios.post(`${API_BASE_URL}/api/physical-devices/${deviceId}/metrics`),
-            axios.post(`${API_BASE_URL}/api/physical-devices/${deviceId}/client-devices`)
-          ]);
-
-          return {
-            deviceId,
-            info: devices[deviceId],
-            metrics: metricsRes.data.status === 'success' ? metricsRes.data.data : null,
-            services: servicesRes.data.status === 'success' ? servicesRes.data.devices : []
-          };
-        } catch (error) {
-          console.error(`Error fetching data for ${deviceId}:`, error);
-          return {
-            deviceId,
-            info: devices[deviceId],
-            metrics: null,
-            services: [],
-            error: error.message
-          };
-        }
-      });
-
-      const devicesData = await Promise.all(dataPromises);
+      const devices = response.data;
+      console.log('Loaded devices with full data:', Object.keys(devices));
       
-      // Transform into a map structure
-      const devicesMap = {};
-      devicesData.forEach(({ deviceId, info, metrics, services, error }) => {
-        devicesMap[deviceId] = {
-          ...info,
-          metrics,
-          services,
-          error
-        };
-      });
-
-      setPhysicalDevices(devicesMap);
-      console.log('All device data loaded:', devicesMap);
+      // Data already includes metrics and services from backend
+      setPhysicalDevices(devices);
+      
     } catch (error) {
       console.error('Error fetching physical devices:', error);
+      setPhysicalDevices({});
     }
   };
 
@@ -221,8 +184,8 @@ const DevicesBeta = () => {
                     🖥️ {deviceId}
                   </div>
                   <div style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
-                    User: <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
-                      {deviceData.username || 'unknown'}
+                    Hostname: <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                      {deviceData.hostname || 'unknown'}
                     </span>
                   </div>
                   {deviceData.version && (
@@ -245,7 +208,7 @@ const DevicesBeta = () => {
               </div>
 
               {/* System Metrics - ALWAYS VISIBLE */}
-              {metrics ? (
+              {metrics && metrics.cpu_percent !== undefined ? (
                 <div style={{ marginBottom: '20px' }}>
                   <h3 style={{ fontSize: '18px', marginBottom: '15px', color: '#333' }}>
                     📊 System Metrics
@@ -255,75 +218,87 @@ const DevicesBeta = () => {
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '15px'
                   }}>
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.cpu_percent)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>CPU Usage</div>
+                    {metrics.cpu_percent !== undefined && (
                       <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.cpu_percent) 
+                        padding: '15px', 
+                        background: '#f5f5f5', 
+                        borderRadius: '8px',
+                        borderLeft: `4px solid ${getMetricColor(metrics.cpu_percent)}`
                       }}>
-                        {metrics.cpu_percent.toFixed(1)}%
+                        <div style={{ fontSize: '14px', color: '#666' }}>CPU Usage</div>
+                        <div style={{ 
+                          fontSize: '24px', 
+                          fontWeight: 'bold', 
+                          color: getMetricColor(metrics.cpu_percent) 
+                        }}>
+                          {metrics.cpu_percent.toFixed(1)}%
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.temperature, { warning: 65, danger: 75 })}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Temperature</div>
+                    {metrics.temperature !== undefined && (
                       <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.temperature, { warning: 65, danger: 75 }) 
+                        padding: '15px', 
+                        background: '#f5f5f5', 
+                        borderRadius: '8px',
+                        borderLeft: `4px solid ${getMetricColor(metrics.temperature, { warning: 65, danger: 75 })}`
                       }}>
-                        {metrics.temperature.toFixed(1)}°C
+                        <div style={{ fontSize: '14px', color: '#666' }}>Temperature</div>
+                        <div style={{ 
+                          fontSize: '24px', 
+                          fontWeight: 'bold', 
+                          color: getMetricColor(metrics.temperature, { warning: 65, danger: 75 }) 
+                        }}>
+                          {metrics.temperature.toFixed(1)}°C
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.memory_percent)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Memory</div>
+                    {metrics.memory_percent !== undefined && (
                       <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.memory_percent) 
+                        padding: '15px', 
+                        background: '#f5f5f5', 
+                        borderRadius: '8px',
+                        borderLeft: `4px solid ${getMetricColor(metrics.memory_percent)}`
                       }}>
-                        {metrics.memory_percent.toFixed(1)}%
+                        <div style={{ fontSize: '14px', color: '#666' }}>Memory</div>
+                        <div style={{ 
+                          fontSize: '24px', 
+                          fontWeight: 'bold', 
+                          color: getMetricColor(metrics.memory_percent) 
+                        }}>
+                          {metrics.memory_percent.toFixed(1)}%
+                        </div>
+                        {metrics.memory_used !== undefined && metrics.memory_total !== undefined && (
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                            {formatBytes(metrics.memory_used)} / {formatBytes(metrics.memory_total)}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                        {formatBytes(metrics.memory_used)} / {formatBytes(metrics.memory_total)}
-                      </div>
-                    </div>
+                    )}
 
-                    <div style={{ 
-                      padding: '15px', 
-                      background: '#f5f5f5', 
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${getMetricColor(metrics.disk_usage)}`
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666' }}>Disk Usage</div>
+                    {metrics.disk_usage !== undefined && (
                       <div style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
-                        color: getMetricColor(metrics.disk_usage) 
+                        padding: '15px', 
+                        background: '#f5f5f5', 
+                        borderRadius: '8px',
+                        borderLeft: `4px solid ${getMetricColor(metrics.disk_usage)}`
                       }}>
-                        {metrics.disk_usage.toFixed(1)}%
+                        <div style={{ fontSize: '14px', color: '#666' }}>Disk Usage</div>
+                        <div style={{ 
+                          fontSize: '24px', 
+                          fontWeight: 'bold', 
+                          color: getMetricColor(metrics.disk_usage) 
+                        }}>
+                          {metrics.disk_usage.toFixed(1)}%
+                        </div>
+                        {metrics.disk_used !== undefined && metrics.disk_total !== undefined && (
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+                            {formatBytes(metrics.disk_used)} / {formatBytes(metrics.disk_total)}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                        {formatBytes(metrics.disk_used)} / {formatBytes(metrics.disk_total)}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ) : (

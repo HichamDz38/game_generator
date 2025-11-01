@@ -109,14 +109,14 @@
 }
 
 .sidenav {
-  height: 100%; 
+  height: 95%; 
   width: 30rem; 
   position: fixed; 
   z-index: 1; 
   left: 0;
   background-color: #eee6ff; 
   overflow-x: hidden;
-  top: 6%;
+  top: 5%;
 }
 
 .scenarionnamebox {

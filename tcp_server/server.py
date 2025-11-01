@@ -445,10 +445,122 @@ def remove_device(device_id):
     elif device_id in connected_physical_devices:
         del connected_physical_devices[device_id]
         r.set(name="connected_physical_devices", value=json.dumps(connected_physical_devices))
-        # Physical devices don't have commands/status queues
+        # Clean up cached data
+        r.delete(f"{device_id}:cached_metrics")
+        r.delete(f"{device_id}:cached_devices")
         print(f"Removed physical device {device_id}")
     else:
         print(f"Device {device_id} not found in connected devices.")
+
+
+def poll_physical_devices_background():
+    """
+    Background thread that polls all connected physical devices for metrics and services
+    Stores results in Redis cache for instant API access
+    """
+    print("[+] Starting background physical device polling thread...")
+    
+    while True:
+        try:
+            # Check if server is stopping
+            if r.get("tcp_server:status") != "running":
+                print("[!] Server stopping, exiting physical device polling thread")
+                break
+            
+            # Get list of connected physical devices
+            devices_json = r.get("connected_physical_devices")
+            if not devices_json:
+                time.sleep(10)  # No devices, wait longer
+                continue
+            
+            devices = json.loads(devices_json)
+            
+            for device_id in list(devices.keys()):
+                try:
+                    print(f"[+] Polling physical device {device_id} for metrics...")
+                    
+                    # Send get_metrics command
+                    metrics_command = {"action": "get_metrics", "params": {}}
+                    command_key = f"{device_id}:physical_command"
+                    response_key = f"{device_id}:physical_response"
+                    
+                    # Clear old response
+                    r.delete(response_key)
+                    
+                    # Send command
+                    r.set(command_key, json.dumps(metrics_command))
+                    
+                    # Wait for response (max 10 seconds)
+                    start_time = time.time()
+                    metrics_data = None
+                    while time.time() - start_time < 10:
+                        response_json = r.get(response_key)
+                        if response_json:
+                            r.delete(response_key)
+                            response = json.loads(response_json)
+                            if response.get("status") == "success":
+                                metrics_data = response.get("data")
+                                break
+                            else:
+                                print(f"[!] Metrics failed for {device_id}: {response.get('message')}")
+                                break
+                        time.sleep(0.1)
+                    
+                    # Cache metrics if successful
+                    if metrics_data:
+                        metrics_cache_key = f"{device_id}:cached_metrics"
+                        r.setex(metrics_cache_key, 30, json.dumps(metrics_data))  # 30s TTL
+                        print(f"[+] Cached metrics for {device_id}: CPU={metrics_data.get('cpu_percent')}%")
+                    
+                    # Small delay before next command
+                    time.sleep(0.5)
+                    
+                    # Send list_devices command
+                    print(f"[+] Polling physical device {device_id} for client devices...")
+                    devices_command = {"action": "list_devices", "params": {}}
+                    
+                    # Clear old response
+                    r.delete(response_key)
+                    
+                    # Send command
+                    r.set(command_key, json.dumps(devices_command))
+                    
+                    # Wait for response (max 10 seconds)
+                    start_time = time.time()
+                    devices_data = None
+                    while time.time() - start_time < 10:
+                        response_json = r.get(response_key)
+                        if response_json:
+                            r.delete(response_key)
+                            response = json.loads(response_json)
+                            if response.get("status") == "success":
+                                devices_data = response.get("data")
+                                break
+                            else:
+                                print(f"[!] Devices list failed for {device_id}: {response.get('message')}")
+                                break
+                        time.sleep(0.1)
+                    
+                    # Cache devices if successful
+                    if devices_data:
+                        devices_cache_key = f"{device_id}:cached_devices"
+                        r.setex(devices_cache_key, 30, json.dumps(devices_data))  # 30s TTL
+                        print(f"[+] Cached devices for {device_id}: {len(devices_data)} service(s)")
+                    
+                except Exception as e:
+                    print(f"[!] Error polling physical device {device_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Poll every 10 seconds
+            print(f"[+] Physical device polling complete, sleeping 10s...")
+            time.sleep(10)
+            
+        except Exception as e:
+            print(f"[!] Error in physical device polling thread: {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(10)
 
 
 if __name__ == "__main__":
@@ -456,6 +568,10 @@ if __name__ == "__main__":
         # Initialize server status
         r.set("tcp_server:status", "running")
         print("[+] TCP Server starting...")
+        
+        # Start background polling thread for physical devices
+        polling_thread = threading.Thread(target=poll_physical_devices_background, daemon=True)
+        polling_thread.start()
         
         start_server(HOST, PORT)
     except KeyboardInterrupt:

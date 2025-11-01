@@ -1266,10 +1266,6 @@ const executeConditionNode = async (node, pathId = null) => {
 };
 
   const handleStartExecution = async () => {
-  // Stop all devices before starting
-  console.log('Clearing all devices before starting scenario...');
-  await stopAllDevices();
-  
   setisStart(true);
   isRunningRef.current = true;
   
@@ -1311,10 +1307,6 @@ const executeConditionNode = async (node, pathId = null) => {
     
     console.log('Flow execution completed normally');
     
-    // Stop all devices when scenario completes
-    console.log('Stopping all devices after scenario completion...');
-    await stopAllDevices();
-    
     setNodes(nds => nds.map(n => ({
       ...n,
       style: { ...n.style, backgroundColor: undefined, border: undefined }
@@ -1335,10 +1327,6 @@ const executeConditionNode = async (node, pathId = null) => {
 
   } catch (error) {
     console.error('Flow execution failed:', error);
-    
-    // Stop all devices when scenario fails or is stopped
-    console.log('Stopping all devices after scenario error/stop...');
-    await stopAllDevices();
     
     setNodes(nds => nds.map(n => ({
       ...n,

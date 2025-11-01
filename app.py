@@ -789,8 +789,16 @@ def send_physical_device_command(device_id, command_data, timeout=30):
     
     # Check if device is connected
     devices_json = redis_client.get("connected_physical_devices")
-    if not devices_json or device_id not in json.loads(devices_json):
+    if not devices_json:
+        logger.error(f"No devices in connected_physical_devices Redis key")
+        return False, "No physical devices connected", None
+        
+    devices = json.loads(devices_json)
+    if device_id not in devices:
+        logger.error(f"Device {device_id} not found in connected devices: {list(devices.keys())}")
         return False, f"Physical device {device_id} not connected", None
+    
+    logger.debug(f"Device {device_id} is connected, sending command: {command_data.get('action')}")
     
     # Send command via Redis
     command_key = f"{device_id}:physical_command"
@@ -801,53 +809,134 @@ def send_physical_device_command(device_id, command_data, timeout=30):
     
     # Send command
     redis_client.set(command_key, json.dumps(command_data))
+    logger.debug(f"Command set to Redis key: {command_key}")
     
     # Wait for response (poll Redis)
     start_time = time.time()
+    poll_count = 0
     while time.time() - start_time < timeout:
         response_json = redis_client.get(response_key)
         if response_json:
+            elapsed = time.time() - start_time
+            logger.debug(f"Response received after {elapsed:.2f}s and {poll_count} polls")
             redis_client.delete(response_key)  # Clean up
-            response = json.loads(response_json)
             
-            if response.get("status") == "success":
-                return True, response.get("message", "Success"), response.get("data")
-            else:
-                return False, response.get("message", "Failed"), response.get("data")
+            try:
+                response = json.loads(response_json)
+                
+                if response.get("status") == "success":
+                    logger.debug(f"Command successful: {response.get('message', 'Success')}")
+                    return True, response.get("message", "Success"), response.get("data")
+                else:
+                    logger.warning(f"Command failed: {response.get('message', 'Failed')}")
+                    return False, response.get("message", "Failed"), response.get("data")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse response JSON: {response_json[:100]}")
+                return False, f"Invalid JSON response: {str(e)}", None
         
+        poll_count += 1
         time.sleep(0.1)  # Poll every 100ms
     
     # Timeout - clean up command
     redis_client.delete(command_key)
+    logger.error(f"Command timeout after {timeout}s ({poll_count} polls, no response on {response_key})")
     return False, f"Command timeout ({timeout}s)", None
 
 
 @app.route('/api/physical-devices', methods=['GET'])
 def get_physical_devices():
-    """Get all connected physical devices"""
+    """Get all connected physical devices with full data (metrics + services)"""
     try:
         devices_json = redis_client.get("connected_physical_devices")
-        if devices_json:
-            devices = json.loads(devices_json)
-            return jsonify(devices), 200
-        return jsonify({}), 200
+        if not devices_json:
+            logger.info("No physical devices connected")
+            return jsonify({}), 200
+        
+        devices = json.loads(devices_json)
+        logger.info(f"Found {len(devices)} physical device(s): {list(devices.keys())}")
+        
+        # For each device, read cached metrics and services from Redis
+        for device_id in devices.keys():
+            logger.info(f"Reading cached data for device: {device_id}")
+            
+            try:
+                # Try to get cached metrics from Redis (pushed by monitor device)
+                metrics_key = f"{device_id}:cached_metrics"
+                metrics_json = redis_client.get(metrics_key)
+                
+                if metrics_json:
+                    devices[device_id]['metrics'] = json.loads(metrics_json)
+                    logger.info(f"✓ Cached metrics found for {device_id}")
+                else:
+                    # Fallback: query on-demand (old behavior)
+                    logger.warning(f"No cached metrics for {device_id}, querying on-demand...")
+                    metrics_command = {"action": "get_metrics", "params": {}}
+                    metrics_success, metrics_msg, metrics_data = send_physical_device_command(
+                        device_id, metrics_command, timeout=10
+                    )
+                    devices[device_id]['metrics'] = metrics_data if metrics_success else None
+                    if not metrics_success:
+                        devices[device_id]['metrics_error'] = metrics_msg
+                
+                # Try to get cached device list from Redis (pushed by monitor device)
+                devices_key = f"{device_id}:cached_devices"
+                devices_json = redis_client.get(devices_key)
+                
+                if devices_json:
+                    devices[device_id]['services'] = json.loads(devices_json)
+                    logger.info(f"✓ Cached services found for {device_id}: {len(devices[device_id]['services'])} service(s)")
+                else:
+                    # Fallback: query on-demand (old behavior)
+                    logger.warning(f"No cached services for {device_id}, querying on-demand...")
+                    services_command = {"action": "list_devices", "params": {}}
+                    services_success, services_msg, services_data = send_physical_device_command(
+                        device_id, services_command, timeout=10
+                    )
+                    devices[device_id]['services'] = services_data if services_success else []
+                    if not services_success:
+                        devices[device_id]['services_error'] = services_msg
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error for {device_id}: {str(e)}")
+                devices[device_id]['metrics'] = None
+                devices[device_id]['services'] = []
+                devices[device_id]['error'] = f"JSON decode error: {str(e)}"
+            except Exception as e:
+                logger.error(f"Error fetching data for {device_id}: {str(e)}", exc_info=True)
+                devices[device_id]['metrics'] = None
+                devices[device_id]['services'] = []
+                devices[device_id]['error'] = str(e)
+        
+        logger.info(f"Returning data for {len(devices)} device(s)")
+        return jsonify(devices), 200
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing connected_physical_devices from Redis: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Invalid device data in Redis'}), 500
     except Exception as e:
-        logger.error(f"Error getting physical devices: {str(e)}")
+        logger.error(f"Error getting physical devices: {str(e)}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/physical-devices/<device_id>/metrics', methods=['POST'])
+@app.route('/api/physical-devices/<device_id>/metrics', methods=['GET'])
 def get_physical_device_metrics(device_id):
-    """Get system metrics from a physical device"""
+    """Get system metrics from a physical device (reads from cached Redis data)"""
     try:
-        command = {
-            "action": "get_metrics", 
-            "params": {}
-        }
-        success, message, data = send_physical_device_command(device_id, command)
+        # Try to get cached metrics from Redis first
+        metrics_key = f"{device_id}:cached_metrics"
+        metrics_json = redis_client.get(metrics_key)
+        
+        if metrics_json:
+            data = json.loads(metrics_json)
+            return jsonify({"status": "success", "data": data, "source": "cached"}), 200
+        
+        # Fallback to on-demand query if cache not available
+        logger.warning(f"No cached metrics for {device_id}, querying on-demand...")
+        command = {"action": "get_metrics", "params": {}}
+        success, message, data = send_physical_device_command(device_id, command, timeout=10)
         
         if success:
-            return jsonify({"status": "success", "data": data}), 200
+            return jsonify({"status": "success", "data": data, "source": "on-demand"}), 200
         else:
             return jsonify({"status": "error", "message": message}), 500
     except Exception as e:
@@ -855,15 +944,30 @@ def get_physical_device_metrics(device_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/physical-devices/<device_id>/client-devices', methods=['POST'])
+@app.route('/api/physical-devices/<device_id>/client-devices', methods=['GET'])
 def get_client_devices_on_pi(device_id):
-    """Get list of client device services running on this Pi"""
+    """Get list of client device services running on this Pi (reads from cached Redis data)"""
     try:
-        command = {
-            "action": "list_devices", 
-            "params": {}
-        }
-        success, message, data = send_physical_device_command(device_id, command)
+        # Try to get cached device list from Redis first
+        devices_key = f"{device_id}:cached_devices"
+        devices_json = redis_client.get(devices_key)
+        
+        if devices_json:
+            data = json.loads(devices_json)
+            return jsonify({"status": "success", "devices": data, "source": "cached"}), 200
+        
+        # Fallback to on-demand query if cache not available
+        logger.warning(f"No cached devices for {device_id}, querying on-demand...")
+        command = {"action": "list_devices", "params": {}}
+        success, message, data = send_physical_device_command(device_id, command, timeout=10)
+        
+        if success:
+            return jsonify({"status": "success", "devices": data, "source": "on-demand"}), 200
+        else:
+            return jsonify({"status": "error", "message": message}), 500
+    except Exception as e:
+        logger.error(f"Error listing client devices: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
         
         if success:
             return jsonify({"status": "success", "devices": data}), 200
