@@ -36,10 +36,12 @@ const DevicesPage = () => {
     // Initial fetch
     fetchAllDeviceData();
 
-    // Auto-refresh every 10 seconds
+    // Auto-refresh every 30 seconds for stability
+    // Post-command refresh ensures immediate updates in Redis cache
+    // So slower polling is safe and reduces server load
     const interval = setInterval(() => {
       fetchAllDeviceData();
-    }, 10000);
+    }, 30000);
 
     return () => {
       if (interval) clearInterval(interval);
@@ -55,7 +57,11 @@ const DevicesPage = () => {
   };
 
   const handleRestartPi = async (deviceId) => {
+    console.log('[DEBUG] handleRestartPi called with deviceId:', deviceId);
+    console.log('[DEBUG] API_BASE_URL:', API_BASE_URL);
+    
     if (!window.confirm(`⚠️ WARNING: This will RESTART the entire Raspberry Pi (${deviceId}).\n\nAll services will be stopped and the device will reboot.\n\nAre you sure?`)) {
+      console.log('[DEBUG] User cancelled restart');
       return;
     }
 
@@ -179,6 +185,58 @@ const DevicesPage = () => {
     await fetchAllDeviceData();
   };
 
+  const handleRestartAllPis = async () => {
+    const deviceCount = Object.keys(physicalDevices).length;
+    
+    if (deviceCount === 0) {
+      alert('No physical devices connected');
+      return;
+    }
+
+    if (!window.confirm(`⚠️ WARNING: This will RESTART ALL ${deviceCount} Raspberry Pi device(s).\n\nAll services on all devices will be stopped and devices will reboot.\n\nAre you sure?`)) {
+      return;
+    }
+
+    setLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    for (const deviceId of Object.keys(physicalDevices)) {
+      try {
+        console.log(`Sending restart Pi command to ${deviceId}...`);
+        const response = await axios.post(
+          `${API_BASE_URL}/api/physical-devices/${deviceId}/restart-pi`,
+          { confirm: true }
+        );
+        
+        if (response.data.status === 'success') {
+          successCount++;
+        } else {
+          failCount++;
+          errors.push(`${deviceId}: ${response.data.message}`);
+        }
+      } catch (error) {
+        failCount++;
+        errors.push(`${deviceId}: ${error.response?.data?.message || error.message}`);
+      }
+    }
+
+    setLoading(false);
+
+    // Show results
+    let message = `Restart All Pis completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
+    if (errors.length > 0 && errors.length <= 5) {
+      message += '\n\nErrors:\n' + errors.join('\n');
+    } else if (errors.length > 5) {
+      message += '\n\nShowing first 5 errors:\n' + errors.slice(0, 5).join('\n');
+    }
+    alert(message + '\n\nDevices will reconnect in ~60 seconds.');
+
+    // Refresh all data
+    await fetchAllDeviceData();
+  };
+
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -207,7 +265,7 @@ const DevicesPage = () => {
           🔄 Refresh Devices
         </button>
         <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
-          Auto-refreshing every 10 seconds
+          Auto-refreshing every 30 seconds (immediate update after commands)
         </div>
       </div>
 
@@ -221,66 +279,116 @@ const DevicesPage = () => {
           borderRadius: '8px',
           border: '2px solid #ddd'
         }}>
-          <div style={{ 
-            fontSize: '14px', 
-            fontWeight: 'bold', 
-            color: '#333',
-            marginBottom: '10px'
-          }}>
-            🎛️ Control All Client Devices
+          {/* Client Services Control */}
+          <div style={{ marginBottom: '15px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 'bold', 
+              color: '#333',
+              marginBottom: '10px'
+            }}>
+              🎛️ Control All Client Services
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button 
+                className={styles.theme__button}
+                onClick={() => handleBulkServiceAction('start')}
+                disabled={loading}
+                style={{ 
+                  fontSize: '14px', 
+                  padding: '8px 20px',
+                  background: '#4caf50',
+                  minWidth: '120px'
+                }}
+              >
+                ▶️ Start All
+              </button>
+              <button 
+                className={styles.theme__button}
+                onClick={() => handleBulkServiceAction('restart')}
+                disabled={loading}
+                style={{ 
+                  fontSize: '14px', 
+                  padding: '8px 20px',
+                  background: '#ff9800',
+                  minWidth: '120px'
+                }}
+              >
+                🔄 Restart All
+              </button>
+              <button 
+                className={styles.delete}
+                onClick={() => handleBulkServiceAction('stop')}
+                disabled={loading}
+                style={{ 
+                  fontSize: '14px', 
+                  padding: '8px 20px',
+                  minWidth: '120px'
+                }}
+              >
+                ⏹️ Stop All
+              </button>
+            </div>
+            <div style={{ 
+              marginTop: '8px', 
+              fontSize: '12px', 
+              color: '#666',
+              fontStyle: 'italic'
+            }}>
+              These actions will affect all client services across all connected devices
+            </div>
           </div>
+
+          {/* Separator */}
           <div style={{ 
-            display: 'flex', 
-            gap: '10px', 
-            justifyContent: 'center',
-            flexWrap: 'wrap'
-          }}>
-            <button 
-              className={styles.theme__button}
-              onClick={() => handleBulkServiceAction('start')}
-              disabled={loading}
-              style={{ 
-                fontSize: '14px', 
-                padding: '8px 20px',
-                background: '#4caf50',
-                minWidth: '120px'
-              }}
-            >
-              ▶️ Start All
-            </button>
-            <button 
-              className={styles.theme__button}
-              onClick={() => handleBulkServiceAction('restart')}
-              disabled={loading}
-              style={{ 
-                fontSize: '14px', 
-                padding: '8px 20px',
-                background: '#ff9800',
-                minWidth: '120px'
-              }}
-            >
-              🔄 Restart All
-            </button>
-            <button 
-              className={styles.delete}
-              onClick={() => handleBulkServiceAction('stop')}
-              disabled={loading}
-              style={{ 
-                fontSize: '14px', 
-                padding: '8px 20px',
-                minWidth: '120px'
-              }}
-            >
-              ⏹️ Stop All
-            </button>
-          </div>
-          <div style={{ 
-            marginTop: '8px', 
-            fontSize: '12px', 
-            color: '#666',
-            fontStyle: 'italic'
-          }}>
-            These actions will affect all client services across all connected devices
+            height: '1px', 
+            background: '#ddd', 
+            margin: '15px 0'
+          }}></div>
+
+          {/* Physical Device Control */}
+          <div>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 'bold', 
+              color: '#d32f2f',
+              marginBottom: '10px'
+            }}>
+              🖥️ Control Physical Devices (Pi)
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button 
+                className={styles.delete}
+                onClick={handleRestartAllPis}
+                disabled={loading}
+                style={{ 
+                  fontSize: '14px', 
+                  padding: '8px 20px',
+                  minWidth: '140px'
+                }}
+              >
+                ⚠️ Restart All Pis
+              </button>
+            </div>
+            <div style={{ 
+              marginTop: '8px', 
+              fontSize: '12px', 
+              color: '#d32f2f',
+              fontStyle: 'italic',
+              fontWeight: 'bold'
+            }}>
+              ⚠️ WARNING: This will reboot all {Object.keys(physicalDevices).length} Raspberry Pi(s) immediately!
+            </div>
           </div>
         </div>
       )}

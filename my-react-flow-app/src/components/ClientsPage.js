@@ -31,9 +31,20 @@ const ClientsPage = () => {
   };
 
   useEffect(() => {
-    // Fetch only on page load
+    // Fetch on page load
     fetchDevices();
     fetchServerStatus();
+
+    // Auto-refresh every 20 seconds for clients data
+    // Faster than devices (20s vs 30s) since client states change more frequently
+    const interval = setInterval(() => {
+      fetchDevices();
+      fetchServerStatus();
+    }, 20000);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
