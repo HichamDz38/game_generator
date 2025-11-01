@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styles from './MyComponent.module.css';
-import { mockPhysicalDevices } from './DevicesBeta.mock';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 // Set to true to use mock data (for testing without backend)
 const USE_MOCK_DATA = !API_BASE_URL || API_BASE_URL === '';
+
+// Mock data for development (inline)
+const mockPhysicalDevices = USE_MOCK_DATA ? {
+  "192.168.16.195": {
+    "hostname": "raspberrypi1",
+    "version": "1.0.0",
+    "metrics": {
+      "cpu_percent": 23.5,
+      "memory_percent": 45.2,
+      "memory_used": 1932735283,
+      "temperature": 42.5,
+      "disk_usage": 67.8,
+      "disk_used": 27917287219
+    },
+    "services": [
+      { "service_name": "Client_Device_epaper.service", "device_name": "epaper", "status": "active/running" }
+    ]
+  }
+} : {};
 
 const DevicesBeta = () => {
   const [physicalDevices, setPhysicalDevices] = useState({});
