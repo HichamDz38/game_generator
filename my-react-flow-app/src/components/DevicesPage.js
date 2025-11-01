@@ -186,14 +186,17 @@ const DevicesPage = () => {
   };
 
   const handleRestartAllPis = async () => {
-    const deviceCount = Object.keys(physicalDevices).length;
+    // Only restart CLIENT devices, SKIP server
+    const clientDeviceIds = Object.entries(physicalDevices)
+      .filter(([_, data]) => data.device_type !== "server")
+      .map(([deviceId, _]) => deviceId);
     
-    if (deviceCount === 0) {
-      alert('No physical devices connected');
+    if (clientDeviceIds.length === 0) {
+      alert('No client devices to restart');
       return;
     }
 
-    if (!window.confirm(`⚠️ WARNING: This will RESTART ALL ${deviceCount} Raspberry Pi device(s).\n\nAll services on all devices will be stopped and devices will reboot.\n\nAre you sure?`)) {
+    if (!window.confirm(`⚠️ WARNING: This will RESTART ALL ${clientDeviceIds.length} Raspberry Pi device(s).\n\nAll services on client devices will be stopped and devices will reboot.\n\n✓ Central server will NOT be affected\n\nAre you sure?`)) {
       return;
     }
 
@@ -202,7 +205,7 @@ const DevicesPage = () => {
     let failCount = 0;
     const errors = [];
 
-    for (const deviceId of Object.keys(physicalDevices)) {
+    for (const deviceId of clientDeviceIds) {
       try {
         console.log(`Sending restart Pi command to ${deviceId}...`);
         const response = await axios.post(
@@ -225,13 +228,14 @@ const DevicesPage = () => {
     setLoading(false);
 
     // Show results
-    let message = `Restart All Pis completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
+    let message = `Restart All Client Pis completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
     if (errors.length > 0 && errors.length <= 5) {
       message += '\n\nErrors:\n' + errors.join('\n');
     } else if (errors.length > 5) {
       message += '\n\nShowing first 5 errors:\n' + errors.slice(0, 5).join('\n');
     }
-    alert(message + '\n\nDevices will reconnect in ~60 seconds.');
+    message += '\n\n✓ Central server was NOT restarted\n\nClient devices will reconnect in ~60 seconds.';
+    alert(message);
 
     // Refresh all data
     await fetchAllDeviceData();
@@ -387,7 +391,9 @@ const DevicesPage = () => {
               fontStyle: 'italic',
               fontWeight: 'bold'
             }}>
-              ⚠️ WARNING: This will reboot all {Object.keys(physicalDevices).length} Raspberry Pi(s) immediately!
+              ⚠️ WARNING: This will reboot all client Raspberry Pi(s) immediately!
+              <br />
+              ✓ Central server will NOT be affected
             </div>
           </div>
         </div>
