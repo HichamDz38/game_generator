@@ -205,6 +205,56 @@ def cleanup_device(device_id, num_nodes):
         remove_device(device_id)
 
 
+def refresh_device_data_after_command(device_id, client_socket):
+    """
+    After a command executes successfully, refresh device metrics and services.
+    This ensures the next API call gets fresh data without waiting for polling.
+    Runs asynchronously to not block the command response.
+    """
+    try:
+        print(f"[+] Starting post-command refresh for {device_id}...")
+        
+        # Get fresh metrics
+        metrics_command = {"action": "get_metrics", "params": {}}
+        client_socket.sendall(json.dumps(metrics_command).encode("utf-8"))
+        
+        client_socket.settimeout(10.0)
+        response_data = client_socket.recv(4096).decode('utf-8')
+        client_socket.settimeout(None)
+        
+        if response_data:
+            response = json.loads(response_data)
+            if response.get("status") == "success":
+                metrics_data = response.get("data")
+                r.setex(f"{device_id}:cached_metrics", 90, json.dumps(metrics_data))
+                print(f"[+] Updated metrics cache for {device_id}")
+        
+        # Small delay between requests
+        time.sleep(0.5)
+        
+        # Get fresh services list
+        services_command = {"action": "list_devices", "params": {}}
+        client_socket.sendall(json.dumps(services_command).encode("utf-8"))
+        
+        client_socket.settimeout(10.0)
+        response_data = client_socket.recv(4096).decode('utf-8')
+        client_socket.settimeout(None)
+        
+        if response_data:
+            response = json.loads(response_data)
+            if response.get("status") == "success":
+                services_data = response.get("data")
+                r.setex(f"{device_id}:cached_devices", 90, json.dumps(services_data))
+                print(f"[+] Updated services cache for {device_id}")
+        
+        print(f"[+] Post-command refresh completed for {device_id}")
+        
+    except socket.timeout:
+        print(f"[!] Timeout during post-command refresh for {device_id}")
+    except Exception as e:
+        print(f"[!] Error during post-command refresh for {device_id}: {e}")
+
+
 def handle_client(client_socket, addr):
     print(f"Accepted connection from {addr}")
     # Check if server is stopping
@@ -277,6 +327,16 @@ def handle_client(client_socket, addr):
                         response_key = f"{device_id}:physical_response"
                         r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
                         print(f"[+] Physical device response: {response.get('status')} - {response.get('message')}")
+                        
+                        # IMMEDIATELY refresh device metrics and services after command
+                        # This ensures next API call gets fresh data without waiting for polling
+                        if response.get("status") == "success":
+                            print(f"[+] Refreshing device data for {device_id} after successful command...")
+                            threading.Thread(
+                                target=refresh_device_data_after_command,
+                                args=(device_id, client_socket),
+                                daemon=True
+                            ).start()
                     else:
                         print(f"[!] No response from physical device {device_id}")
                         error_response = {"status": "failed", "message": "No response from device"}
@@ -509,7 +569,7 @@ def poll_physical_devices_background():
                     # Cache metrics if successful
                     if metrics_data:
                         metrics_cache_key = f"{device_id}:cached_metrics"
-                        r.setex(metrics_cache_key, 30, json.dumps(metrics_data))  # 30s TTL
+                        r.setex(metrics_cache_key, 90, json.dumps(metrics_data))  # 90s TTL (allows 2-3 poll windows)
                         print(f"[+] Cached metrics for {device_id}: CPU={metrics_data.get('cpu_percent')}%")
                     
                     # Small delay before next command
@@ -544,7 +604,7 @@ def poll_physical_devices_background():
                     # Cache devices if successful
                     if devices_data:
                         devices_cache_key = f"{device_id}:cached_devices"
-                        r.setex(devices_cache_key, 30, json.dumps(devices_data))  # 30s TTL
+                        r.setex(devices_cache_key, 90, json.dumps(devices_data))  # 90s TTL (allows 2-3 poll windows)
                         print(f"[+] Cached devices for {device_id}: {len(devices_data)} service(s)")
                     
                 except Exception as e:
@@ -552,9 +612,9 @@ def poll_physical_devices_background():
                     import traceback
                     traceback.print_exc()
             
-            # Poll every 10 seconds
-            print(f"[+] Physical device polling complete, sleeping 10s...")
-            time.sleep(10)
+            # Poll every 30 seconds for stability (not every 10)
+            print("[+] Physical device polling complete, sleeping 30s...")
+            time.sleep(30)
             
         except Exception as e:
             print(f"[!] Error in physical device polling thread: {e}")
