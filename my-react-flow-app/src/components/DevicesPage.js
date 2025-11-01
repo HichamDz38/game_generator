@@ -4,41 +4,12 @@ import styles from './MyComponent.module.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
-// Set to true to use mock data (for testing without backend)
-const USE_MOCK_DATA = !API_BASE_URL || API_BASE_URL === '';
-
-// Mock data for development (inline)
-const mockPhysicalDevices = USE_MOCK_DATA ? {
-  "192.168.16.195": {
-    "hostname": "raspberrypi1",
-    "version": "1.0.0",
-    "metrics": {
-      "cpu_percent": 23.5,
-      "memory_percent": 45.2,
-      "memory_used": 1932735283,
-      "temperature": 42.5,
-      "disk_usage": 67.8,
-      "disk_used": 27917287219
-    },
-    "services": [
-      { "service_name": "Client_Device_epaper.service", "device_name": "epaper", "status": "active/running" }
-    ]
-  }
-} : {};
-
 const DevicesPage = () => {
   const [physicalDevices, setPhysicalDevices] = useState({});
   const [expandedDevices, setExpandedDevices] = useState({});
   const [loading, setLoading] = useState(false);
 
   const fetchAllDeviceData = async () => {
-    // Use mock data if backend not available
-    if (USE_MOCK_DATA) {
-      console.log('Using MOCK data (no backend connection)');
-      setPhysicalDevices(mockPhysicalDevices);
-      return;
-    }
-
     try {
       console.log('Fetching all physical devices with full data (single API call)...');
       const response = await axios.get(`${API_BASE_URL}/api/physical-devices`);
@@ -84,11 +55,6 @@ const DevicesPage = () => {
   };
 
   const handleRestartPi = async (deviceId) => {
-    if (USE_MOCK_DATA) {
-      alert('⚠️ MOCK MODE: Would restart Raspberry Pi ' + deviceId);
-      return;
-    }
-
     if (!window.confirm(`⚠️ WARNING: This will RESTART the entire Raspberry Pi (${deviceId}).\n\nAll services will be stopped and the device will reboot.\n\nAre you sure?`)) {
       return;
     }
@@ -120,31 +86,7 @@ const DevicesPage = () => {
     console.log('Device ID:', deviceId);
     console.log('Service Name:', serviceName);
     console.log('Action:', action);
-    console.log('USE_MOCK_DATA:', USE_MOCK_DATA);
-    console.log('API_BASE_URL:', API_BASE_URL);
     
-    if (USE_MOCK_DATA) {
-      alert(`⚠️ MOCK MODE: Would ${action} service "${serviceName}" on ${deviceId}`);
-      // Update mock data to simulate change
-      setPhysicalDevices(prev => {
-        const updated = { ...prev };
-        if (updated[deviceId]?.services) {
-          updated[deviceId].services = updated[deviceId].services.map(s => {
-            if (s.service_name === serviceName) {
-              if (action === 'start') {
-                return { ...s, status: 'active/running', active: true, running: true };
-              } else if (action === 'stop') {
-                return { ...s, status: 'inactive/dead', active: false, running: false };
-              }
-            }
-            return s;
-          });
-        }
-        return updated;
-      });
-      return;
-    }
-
     const actionText = action === 'restart' ? 'Restart' : action === 'stop' ? 'Stop' : 'Start';
     
     if (!window.confirm(`${actionText} service "${serviceName}" on ${deviceId}?`)) {
@@ -176,6 +118,67 @@ const DevicesPage = () => {
     setLoading(false);
   };
 
+  const handleBulkServiceAction = async (action) => {
+    // Collect all services from all devices
+    const allServices = [];
+    Object.entries(physicalDevices).forEach(([deviceId, deviceData]) => {
+      const services = Array.isArray(deviceData.services) ? deviceData.services : [];
+      services.forEach(service => {
+        allServices.push({ deviceId, service });
+      });
+    });
+
+    if (allServices.length === 0) {
+      alert('No services found to control');
+      return;
+    }
+
+    const actionText = action === 'restart' ? 'Restart' : action === 'stop' ? 'Stop' : 'Start';
+    
+    if (!window.confirm(`${actionText} ALL ${allServices.length} service(s) across ${Object.keys(physicalDevices).length} device(s)?\n\nThis will affect all client devices.`)) {
+      return;
+    }
+
+    setLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    for (const { deviceId, service } of allServices) {
+      try {
+        console.log(`Sending ${action} command to ${deviceId} for service: ${service.service_name}`);
+        const response = await axios.post(
+          `${API_BASE_URL}/api/physical-devices/${deviceId}/service/${action}`,
+          { service_name: service.service_name }
+        );
+        
+        if (response.data.status === 'success') {
+          successCount++;
+        } else {
+          failCount++;
+          errors.push(`${deviceId}/${service.device_name}: ${response.data.message}`);
+        }
+      } catch (error) {
+        failCount++;
+        errors.push(`${deviceId}/${service.device_name}: ${error.response?.data?.message || error.message}`);
+      }
+    }
+
+    setLoading(false);
+
+    // Show results
+    let message = `${actionText} completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
+    if (errors.length > 0 && errors.length <= 5) {
+      message += '\n\nErrors:\n' + errors.join('\n');
+    } else if (errors.length > 5) {
+      message += '\n\nShowing first 5 errors:\n' + errors.slice(0, 5).join('\n');
+    }
+    alert(message);
+
+    // Refresh all data
+    await fetchAllDeviceData();
+  };
+
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -194,22 +197,6 @@ const DevicesPage = () => {
     <div className={styles.Scenariopp}>
       <h1 className={styles.title}>Devices Management</h1>
 
-      {USE_MOCK_DATA && (
-        <div style={{
-          background: '#fff3cd',
-          border: '2px solid #ffc107',
-          borderRadius: '8px',
-          padding: '15px',
-          marginBottom: '20px',
-          textAlign: 'center',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          color: '#856404'
-        }}>
-          🧪 MOCK DATA MODE - Using sample data (no backend connection)
-        </div>
-      )}
-
       <div style={{ textAlign: 'center', marginBottom: '20px' }}>
         <button 
           className={styles.theme__button}
@@ -219,12 +206,84 @@ const DevicesPage = () => {
         >
           🔄 Refresh Devices
         </button>
-        {!USE_MOCK_DATA && (
-          <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
-            Auto-refreshing every 10 seconds
-          </div>
-        )}
+        <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
+          Auto-refreshing every 10 seconds
+        </div>
       </div>
+
+      {/* Bulk Control Buttons */}
+      {Object.keys(physicalDevices).length > 0 && (
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: '20px',
+          padding: '15px',
+          background: '#f5f5f5',
+          borderRadius: '8px',
+          border: '2px solid #ddd'
+        }}>
+          <div style={{ 
+            fontSize: '14px', 
+            fontWeight: 'bold', 
+            color: '#333',
+            marginBottom: '10px'
+          }}>
+            🎛️ Control All Client Devices
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <button 
+              className={styles.theme__button}
+              onClick={() => handleBulkServiceAction('start')}
+              disabled={loading}
+              style={{ 
+                fontSize: '14px', 
+                padding: '8px 20px',
+                background: '#4caf50',
+                minWidth: '120px'
+              }}
+            >
+              ▶️ Start All
+            </button>
+            <button 
+              className={styles.theme__button}
+              onClick={() => handleBulkServiceAction('restart')}
+              disabled={loading}
+              style={{ 
+                fontSize: '14px', 
+                padding: '8px 20px',
+                background: '#ff9800',
+                minWidth: '120px'
+              }}
+            >
+              🔄 Restart All
+            </button>
+            <button 
+              className={styles.delete}
+              onClick={() => handleBulkServiceAction('stop')}
+              disabled={loading}
+              style={{ 
+                fontSize: '14px', 
+                padding: '8px 20px',
+                minWidth: '120px'
+              }}
+            >
+              ⏹️ Stop All
+            </button>
+          </div>
+          <div style={{ 
+            marginTop: '8px', 
+            fontSize: '12px', 
+            color: '#666',
+            fontStyle: 'italic'
+          }}>
+            These actions will affect all client services across all connected devices
+          </div>
+        </div>
+      )}
 
       <h2 className={styles.secondtitle}>
         Connected Physical Devices ({Object.keys(physicalDevices).length})
@@ -244,7 +303,8 @@ const DevicesPage = () => {
         Object.entries(physicalDevices).map(([deviceId, deviceData]) => {
           const isExpanded = expandedDevices[deviceId];
           const metrics = deviceData.metrics;
-          const services = deviceData.services || [];
+          // Ensure services is always an array
+          const services = Array.isArray(deviceData.services) ? deviceData.services : [];
 
           return (
             <div 
