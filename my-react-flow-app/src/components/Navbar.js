@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './MyComponent.module.css';
 
-function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevicesBeta, isFlowRunning }) {
+function Navbarr({ onReturnScenarioSelect, onNavigateToClients, onNavigateToDevices, isFlowRunning }) {
   const handleReturnScenarioClick = (e) => {
     if (isFlowRunning) {
       e.preventDefault();
@@ -13,6 +13,17 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevi
     }
   };
 
+  const handleClientsClick = (e) => {
+    e.preventDefault();
+    if (isFlowRunning) {
+      return;
+    }
+    
+    if (onNavigateToClients) {
+      onNavigateToClients();
+    }
+  };
+
   const handleDevicesClick = (e) => {
     e.preventDefault();
     if (isFlowRunning) {
@@ -21,17 +32,6 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevi
     
     if (onNavigateToDevices) {
       onNavigateToDevices();
-    }
-  };
-
-  const handleDevicesBetaClick = (e) => {
-    e.preventDefault();
-    if (isFlowRunning) {
-      return;
-    }
-    
-    if (onNavigateToDevicesBeta) {
-      onNavigateToDevicesBeta();
     }
   };
 
@@ -55,31 +55,31 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToDevices, onNavigateToDevi
             {isFlowRunning && " (Disabled during execution)"}
           </a>
           <a 
-            href="/devices"
-            onClick={handleDevicesClick}
+            href="/clients"
+            onClick={handleClientsClick}
             className={isFlowRunning ? styles.disabled : ''}
             style={{
               cursor: isFlowRunning ? 'not-allowed' : 'pointer',
               opacity: isFlowRunning ? 0.5 : 1,
               pointerEvents: isFlowRunning ? 'none' : 'auto'
             }}
-            title={isFlowRunning ? "Cannot navigate while flow is running" : "Manage devices"}
+            title={isFlowRunning ? "Cannot navigate while flow is running" : "Manage game clients"}
           >
-            DEVICES
+            CLIENTS
             {isFlowRunning && " (Disabled during execution)"}
           </a>
           <a 
-            href="/devices-beta"
-            onClick={handleDevicesBetaClick}
+            href="/devices"
+            onClick={handleDevicesClick}
             className={isFlowRunning ? styles.disabled : ''}
             style={{
               cursor: isFlowRunning ? 'not-allowed' : 'pointer',
               opacity: isFlowRunning ? 0.5 : 1,
               pointerEvents: isFlowRunning ? 'none' : 'auto',
             }}
-            title={isFlowRunning ? "Cannot navigate while flow is running" : "Physical devices monitor (Beta)"}
+            title={isFlowRunning ? "Cannot navigate while flow is running" : "Physical devices monitor"}
           >
-            DEVICES BETA 🔥
+            DEVICES
             {isFlowRunning && " (Disabled)"}
           </a>
           <a href="/settings">SETTINGS</a>

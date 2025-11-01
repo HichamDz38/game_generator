@@ -3,8 +3,8 @@ import { ReactFlowProvider } from "reactflow";
 import DnDFlow from "./DragDrop/DnDFlow";
 import Navbar from "./components/Navbar";
 import Scenariopage from "./components/Scenariopage";
+import ClientsPage from "./components/ClientsPage";
 import DevicesPage from "./components/DevicesPage";
-import DevicesBeta from "./components/DevicesBeta";
 import { Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 
 function FlowEditorWrapper({ onFlowRunningChange }) {
@@ -44,15 +44,15 @@ export default function App() {
     }
   };
 
-  const handleNavigateToDevices = () => {
+  const handleNavigateToClients = () => {
     if (!isFlowRunning) {
-      navigate("/devices");
+      navigate("/clients");
     }
   };
 
-  const handleNavigateToDevicesBeta = () => {
+  const handleNavigateToDevices = () => {
     if (!isFlowRunning) {
-      navigate("/devices-beta");
+      navigate("/devices");
     }
   };
 
@@ -60,8 +60,8 @@ export default function App() {
     <div className="app">
       <Navbar
         onReturnScenarioSelect={handleReturnScenarioSelect}
+        onNavigateToClients={handleNavigateToClients}
         onNavigateToDevices={handleNavigateToDevices}
-        onNavigateToDevicesBeta={handleNavigateToDevicesBeta}
         isFlowRunning={isFlowRunning}
       />
       <div style={{ display: "flex", flex: 1 }}>
@@ -78,12 +78,12 @@ export default function App() {
             }
           />
           <Route
-            path="/devices"
-            element={<DevicesPage />}
+            path="/clients"
+            element={<ClientsPage />}
           />
           <Route
-            path="/devices-beta"
-            element={<DevicesBeta />}
+            path="/devices"
+            element={<DevicesPage />}
           />
           <Route
             path="/flow/:scenarioName?"
