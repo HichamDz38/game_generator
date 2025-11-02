@@ -4,3 +4,6 @@ test.js
 # build/
 # __pycache__/
 # /src/README.md
+
+# Documentation (kept locally for reference only)
+docs/
