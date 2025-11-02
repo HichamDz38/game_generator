@@ -80,13 +80,11 @@ const ClientsPage = () => {
   };
 
   const handleDisconnectDevice = async (deviceId) => {
-    if (!window.confirm(`Are you sure you want to disconnect ${deviceId}?`)) {
-      return;
-    }
-    
     setLoading(true);
     try {
+      console.log(`[DEBUG] Disconnecting device: ${deviceId}`);
       await axios.post(`${API_BASE_URL}/devices/disconnect/${deviceId}`);
+      console.log(`[DEBUG] Device ${deviceId} disconnected successfully`);
       // Refresh devices after disconnect
       setTimeout(refreshData, 1000);
     } catch (error) {
@@ -102,14 +100,12 @@ const ClientsPage = () => {
       alert('No devices connected');
       return;
     }
-
-    if (!window.confirm(`Are you sure you want to disconnect all ${deviceCount} devices?`)) {
-      return;
-    }
     
     setLoading(true);
     try {
+      console.log(`[DEBUG] Disconnecting all ${deviceCount} devices`);
       await axios.post(`${API_BASE_URL}/devices/disconnect_all`);
+      console.log(`[DEBUG] All devices disconnected successfully`);
       // Refresh devices after disconnect all
       setTimeout(refreshData, 1000);
     } catch (error) {
