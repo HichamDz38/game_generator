@@ -58,6 +58,7 @@ def start_server(host, port):
     
     # Set server status to running in Redis
     while True:
+        server_running = r.get("tcp_server:status") == "running"
         if server_running:
             try:
                 client_socket, addr = server_socket.accept()
@@ -68,15 +69,12 @@ def start_server(host, port):
                 continue
             except Exception as e:
                 print(f"[!] Error accepting connection: {e}")
-            
-        server_running = r.get("tcp_server:status") == "running"
-        server_stopped = r.get("tcp_server:status") == "stopped"
-        if server_stopped:
+        else:
             print("[+] Server shutting down...")
             server_socket.close()
             time.sleep(2)
             return
-        time.sleep(0.5)
+        time.sleep(2)
 
 
 def register_device(device_info, addr, client_socket):
@@ -263,7 +261,7 @@ def refresh_device_data_after_command(device_id, client_socket):
 
 
 def handle_client(client_socket, addr):
-    print(f"Accepted connection from {addr}")
+    print(f"[+] Accepted connection from {addr}")
     # Check if server is stopping
     if r.get("tcp_server:status") == "stopped":
         print(f"[!] Server stopping, rejecting connection from {addr}")
@@ -390,72 +388,82 @@ def handle_client(client_socket, addr):
                 client_socket.close()
                 cleanup_device(device_id, num_nodes)
                 break
-        return
-
-    # Logical devices: poll command queue (existing logic)
-    index = 0
-    logical_device_timeout_count = {}  # Track timeouts per node
-    MAX_LOGICAL_TIMEOUTS = 5  # More lenient for logical devices (no keepalive probe)
-    
-    while True:
-        # Check if server is stopping
-        if r.get("tcp_server:status") == "stopped":
-            print(f"[!] Server stopping, disconnecting device {device_id}")
-            client_socket.close()
-            cleanup_device(device_id, num_nodes)
-            break
-            
-        # Check if device should be disconnected
-        disconnect_cmd = r.get(f"{device_id}:disconnect")
-        if disconnect_cmd == "true":
-            print(f"[!] Disconnect command received for device {device_id}")
-            r.delete(f"{device_id}:disconnect")
-            client_socket.close()
-            cleanup_device(device_id, num_nodes)
-            break
         
-        try:
-            command = get_command_for_device(device_id, num_nodes, index)
-            
-            # Check timeout status for this node
-            if num_nodes > 1:
-                node_instance_id = f"{device_id}_{index+1}"
-            else:
-                node_instance_id = device_id
-            
-            timeout_count = logical_device_timeout_count.get(node_instance_id, 0)
-            if timeout_count >= MAX_LOGICAL_TIMEOUTS:
-                print(f"[!] Logical device {node_instance_id} has timed out {timeout_count} times - disconnecting")
+    else:
+        # Logical devices: poll command queue (existing logic)
+        index = 0
+        logical_device_timeout_count = {}  # Track timeouts per node
+        MAX_LOGICAL_TIMEOUTS = 5  # More lenient for logical devices (no keepalive probe)
+    
+        while True:
+            # Check if server is stopping
+            if r.get("tcp_server:status") == "stopped":
+                print(f"[!] Server stopping, disconnecting device {device_id}")
                 client_socket.close()
                 cleanup_device(device_id, num_nodes)
                 break
                 
-            if command:
-                try:
-                    process_command(client_socket, command, index)
-                    # Reset timeout on successful command
-                    logical_device_timeout_count[node_instance_id] = 0
-                except socket.timeout:
-                    # Track timeout but don't fail immediately
-                    logical_device_timeout_count[node_instance_id] = timeout_count + 1
-                    print(f"[!] No response from {node_instance_id} (timeout count: {logical_device_timeout_count[node_instance_id]}/{MAX_LOGICAL_TIMEOUTS})")
-            else:
-                # No command - reset timeout since device is responding to polls
-                logical_device_timeout_count[node_instance_id] = 0
+            # Check if device should be disconnected
+            disconnect_cmd = r.get(f"{device_id}:disconnect")
+            if disconnect_cmd == "true":
+                print(f"[!] Disconnect command received for device {device_id}")
+                r.delete(f"{device_id}:disconnect")
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
             
-            if num_nodes > 1:
-                index = (index+1) % num_nodes
+            try:
+                command = get_command_for_device(device_id, num_nodes, index)
                 
-        except (socket.error, ConnectionResetError, BrokenPipeError, ConnectionError) as e:
-            print(f"[!] Communication error with device {device_id}: {e}")
-            print("[!] Marking all pending operations as failed")
-            
-            # Mark any in-progress operations as failed
-            if num_nodes > 1:
-                for i in range(num_nodes):
-                    instance_id = f"{device_id}_{i+1}"
+                # Check timeout status for this node
+                if num_nodes > 1:
+                    node_instance_id = f"{device_id}_{index+1}"
+                else:
+                    node_instance_id = device_id
+                
+                timeout_count = logical_device_timeout_count.get(node_instance_id, 0)
+                if timeout_count >= MAX_LOGICAL_TIMEOUTS:
+                    print(f"[!] Logical device {node_instance_id} has timed out {timeout_count} times - disconnecting")
+                    client_socket.close()
+                    cleanup_device(device_id, num_nodes)
+                    break
+                    
+                if command:
+                    try:
+                        process_command(client_socket, command, index)
+                        # Reset timeout on successful command
+                        logical_device_timeout_count[node_instance_id] = 0
+                    except socket.timeout:
+                        # Track timeout but don't fail immediately
+                        logical_device_timeout_count[node_instance_id] = timeout_count + 1
+                        print(f"[!] No response from {node_instance_id} (timeout count: {logical_device_timeout_count[node_instance_id]}/{MAX_LOGICAL_TIMEOUTS})")
+                else:
+                    # No command - reset timeout since device is responding to polls
+                    logical_device_timeout_count[node_instance_id] = 0
+                
+                if num_nodes > 1:
+                    index = (index+1) % num_nodes
+                    
+            except (socket.error, ConnectionResetError, BrokenPipeError, ConnectionError) as e:
+                print(f"[!] Communication error with device {device_id}: {e}")
+                print("[!] Marking all pending operations as failed")
+                
+                # Mark any in-progress operations as failed
+                if num_nodes > 1:
+                    for i in range(num_nodes):
+                        instance_id = f"{device_id}_{i+1}"
+                        # Check for any pending commands and mark as failed
+                        pending_cmds = r.lrange(f"{instance_id}:commands", 0, -1)
+                        for cmd in pending_cmds:
+                            try:
+                                cmd_data = json.loads(cmd)
+                                if cmd_data.get('node_id'):
+                                    r.set(f"flow_execution:{cmd_data['node_id']}", "failed")
+                            except Exception:
+                                pass
+                else:
                     # Check for any pending commands and mark as failed
-                    pending_cmds = r.lrange(f"{instance_id}:commands", 0, -1)
+                    pending_cmds = r.lrange(f"{device_id}:commands", 0, -1)
                     for cmd in pending_cmds:
                         try:
                             cmd_data = json.loads(cmd)
@@ -463,28 +471,18 @@ def handle_client(client_socket, addr):
                                 r.set(f"flow_execution:{cmd_data['node_id']}", "failed")
                         except Exception:
                             pass
-            else:
-                # Check for any pending commands and mark as failed
-                pending_cmds = r.lrange(f"{device_id}:commands", 0, -1)
-                for cmd in pending_cmds:
-                    try:
-                        cmd_data = json.loads(cmd)
-                        if cmd_data.get('node_id'):
-                            r.set(f"flow_execution:{cmd_data['node_id']}", "failed")
-                    except Exception:
-                        pass
-            
-            client_socket.close()
-            cleanup_device(device_id, num_nodes)
-            break
-            
-        except Exception as e:
-            print(f"[!] Unexpected error with device {device_id}: {e}")
-            client_socket.close()
-            cleanup_device(device_id, num_nodes)
-            break
-            
-        time.sleep(0.2)  # Avoid busy waiting
+                
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
+                
+            except Exception as e:
+                print(f"[!] Unexpected error with device {device_id}: {e}")
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
+                
+            time.sleep(0.2)  # Avoid busy waiting
 
 
 def get_device_command(device_id):
@@ -718,8 +716,6 @@ def poll_physical_devices_background():
 
 if __name__ == "__main__":
     try:
-        # Initialize server status
-        r.set("tcp_server:status", "running")
         print("[+] TCP Server starting...")
         
         # Start background polling thread for physical devices
