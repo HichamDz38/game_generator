@@ -310,11 +310,13 @@ def handle_client(client_socket, addr):
                     r.delete(command_key)
                     
                     command_data = json.loads(command_json)
-                    print(f"[+] Sending command to physical device {device_id}: {command_data.get('action')}")
+                    action = command_data.get('action')
+                    print(f"[+] Sending command to physical device {device_id}: {action}")
                     print(f"[+] Full command: {command_json}")
                     
                     # Send command to device
                     client_socket.sendall(command_json.encode("utf-8"))
+                    print(f"[+] Command sent to socket for {device_id}")
                     
                     # Wait for response (with timeout)
                     client_socket.settimeout(30.0)
@@ -322,6 +324,7 @@ def handle_client(client_socket, addr):
                     client_socket.settimeout(None)
                     
                     if response_data:
+                        print(f"[+] Received response from {device_id}: {response_data}")
                         response = json.loads(response_data)
                         # Store response in Redis for Flask to retrieve
                         response_key = f"{device_id}:physical_response"

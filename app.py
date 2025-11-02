@@ -794,22 +794,27 @@ def send_physical_device_command(device_id, command_data, timeout=30):
         return False, "No physical devices connected", None
         
     devices = json.loads(devices_json)
+    logger.info(f"[DEBUG] Connected physical devices in Redis: {list(devices.keys())}")
+    
     if device_id not in devices:
         logger.error(f"Device {device_id} not found in connected devices: {list(devices.keys())}")
         return False, f"Physical device {device_id} not connected", None
     
-    logger.debug(f"Device {device_id} is connected, sending command: {command_data.get('action')}")
+    logger.info(f"[DEBUG] Device {device_id} IS connected, sending command: {command_data.get('action')}")
     
     # Send command via Redis
     command_key = f"{device_id}:physical_command"
     response_key = f"{device_id}:physical_response"
+    
+    logger.info(f"[DEBUG] Setting Redis key: {command_key}")
+    logger.info(f"[DEBUG] Command data: {json.dumps(command_data)}")
     
     # Clear any old response
     redis_client.delete(response_key)
     
     # Send command
     redis_client.set(command_key, json.dumps(command_data))
-    logger.debug(f"Command set to Redis key: {command_key}")
+    logger.info(f"[DEBUG] Command set to Redis key: {command_key}, waiting for response on {response_key}")
     
     # Wait for response (poll Redis)
     start_time = time.time()
@@ -818,17 +823,17 @@ def send_physical_device_command(device_id, command_data, timeout=30):
         response_json = redis_client.get(response_key)
         if response_json:
             elapsed = time.time() - start_time
-            logger.debug(f"Response received after {elapsed:.2f}s and {poll_count} polls")
+            logger.info(f"[DEBUG] Response received after {elapsed:.2f}s and {poll_count} polls: {response_json}")
             redis_client.delete(response_key)  # Clean up
             
             try:
                 response = json.loads(response_json)
                 
                 if response.get("status") == "success":
-                    logger.debug(f"Command successful: {response.get('message', 'Success')}")
+                    logger.info(f"[DEBUG] Command successful: {response.get('message', 'Success')}")
                     return True, response.get("message", "Success"), response.get("data")
                 else:
-                    logger.warning(f"Command failed: {response.get('message', 'Failed')}")
+                    logger.warning(f"[DEBUG] Command failed: {response.get('message', 'Failed')}")
                     return False, response.get("message", "Failed"), response.get("data")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse response JSON: {response_json[:100]}")
@@ -839,7 +844,7 @@ def send_physical_device_command(device_id, command_data, timeout=30):
     
     # Timeout - clean up command
     redis_client.delete(command_key)
-    logger.error(f"Command timeout after {timeout}s ({poll_count} polls, no response on {response_key})")
+    logger.error(f"[DEBUG] Command timeout after {timeout}s ({poll_count} polls, no response on {response_key})")
     return False, f"Command timeout ({timeout}s)", None
 
 
@@ -982,21 +987,28 @@ def get_client_devices_on_pi(device_id):
 def restart_raspberry_pi(device_id):
     """Restart the entire Raspberry Pi"""
     try:
+        logger.info(f"[DEBUG] restart_raspberry_pi called with device_id: {device_id}")
+        
         data = request.get_json()
         confirm = data.get('confirm', False)
+        logger.info(f"[DEBUG] Request data: {data}")
         
         if not confirm:
+            logger.warning(f"[DEBUG] Restart not confirmed for {device_id}")
             return jsonify({"status": "error", "message": "confirm: true required"}), 400
         
         command = {
             "action": "restart_pi", 
             "params": {"confirm": True}
         }
-        success, message, response_data = send_physical_device_command(device_id, command)
+        logger.info(f"[DEBUG] Sending command to device {device_id}: {command}")
         
+        success, message, _ = send_physical_device_command(device_id, command)
+        
+        logger.info(f"[DEBUG] Command result - success: {success}, message: {message}")
         return jsonify({"status": "success" if success else "error", "message": message}), 200 if success else 500
     except Exception as e:
-        logger.error(f"Error restarting Pi: {str(e)}")
+        logger.error(f"Error restarting Pi: {str(e)}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -1029,7 +1041,7 @@ def control_client_service(device_id, action):
         else:
             return jsonify({"status": "error", "message": "Invalid action"}), 400
         
-        success, message, response = send_physical_device_command(device_id, command)
+        success, message, _ = send_physical_device_command(device_id, command)
         
         return jsonify({"status": "success" if success else "error", "message": message}), 200 if success else 500
     except Exception as e:
