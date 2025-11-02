@@ -566,11 +566,14 @@ def poll_physical_devices_background():
                                 break
                         time.sleep(0.1)
                     
-                    # Cache metrics if successful
-                    if metrics_data:
+                    # Cache metrics if response received (even if empty)
+                    if metrics_data is not None:
                         metrics_cache_key = f"{device_id}:cached_metrics"
                         r.setex(metrics_cache_key, 90, json.dumps(metrics_data))  # 90s TTL (allows 2-3 poll windows)
-                        print(f"[+] Cached metrics for {device_id}: CPU={metrics_data.get('cpu_percent')}%")
+                        if isinstance(metrics_data, dict):
+                            print(f"[+] Cached metrics for {device_id}: CPU={metrics_data.get('cpu_percent')}%")
+                        else:
+                            print(f"[+] Cached metrics for {device_id}: {metrics_data}")
                     
                     # Small delay before next command
                     time.sleep(0.5)
@@ -601,11 +604,14 @@ def poll_physical_devices_background():
                                 break
                         time.sleep(0.1)
                     
-                    # Cache devices if successful
-                    if devices_data:
+                    # Cache devices if response received (even if empty list)
+                    if devices_data is not None:
                         devices_cache_key = f"{device_id}:cached_devices"
                         r.setex(devices_cache_key, 90, json.dumps(devices_data))  # 90s TTL (allows 2-3 poll windows)
-                        print(f"[+] Cached devices for {device_id}: {len(devices_data)} service(s)")
+                        if isinstance(devices_data, list):
+                            print(f"[+] Cached devices for {device_id}: {len(devices_data)} service(s)")
+                        else:
+                            print(f"[+] Cached devices for {device_id}: {devices_data}")
                     
                 except Exception as e:
                     print(f"[!] Error polling physical device {device_id}: {e}")
