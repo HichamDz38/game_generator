@@ -288,6 +288,7 @@ def handle_client(client_socket, addr):
     except Exception as e:
         print(f"[!] Error receiving initial device info: {e}")
         client_socket.close()
+        cleanup_device(device_id, num_nodes)
         return
 
     # Physical devices: just wait for direct commands (no queue polling, no disconnect)
@@ -301,64 +302,83 @@ def handle_client(client_socket, addr):
                 cleanup_device(device_id, num_nodes)
                 break
             
-            # Check for physical device commands in Redis
-            command_key = f"{device_id}:physical_command"
-            command_json = r.get(command_key)
-            if command_json:
-                try:
-                    # Delete command immediately to avoid re-processing
-                    r.delete(command_key)
-                    
-                    command_data = json.loads(command_json)
-                    action = command_data.get('action')
-                    print(f"[+] Sending command to physical device {device_id}: {action}")
-                    print(f"[+] Full command: {command_json}")
-                    
-                    # Send command to device
-                    client_socket.sendall(command_json.encode("utf-8"))
-                    print(f"[+] Command sent to socket for {device_id}")
-                    
-                    # Wait for response (with timeout)
-                    client_socket.settimeout(30.0)
-                    response_data = client_socket.recv(4096).decode('utf-8')
-                    client_socket.settimeout(None)
-                    
-                    if response_data:
-                        print(f"[+] Received response from {device_id}: {response_data}")
-                        response = json.loads(response_data)
-                        # Store response in Redis for Flask to retrieve
-                        response_key = f"{device_id}:physical_response"
-                        r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
-                        print(f"[+] Physical device response: {response.get('status')} - {response.get('message')}")
+            try:
+                # Check for physical device commands in Redis
+                command_key = f"{device_id}:physical_command"
+                command_json = r.get(command_key)
+                if command_json:
+                    try:
+                        # Delete command immediately to avoid re-processing
+                        r.delete(command_key)
                         
-                        # IMMEDIATELY refresh device metrics and services after command
-                        # This ensures next API call gets fresh data without waiting for polling
-                        if response.get("status") == "success":
-                            print(f"[+] Refreshing device data for {device_id} after successful command...")
-                            threading.Thread(
-                                target=refresh_device_data_after_command,
-                                args=(device_id, client_socket),
-                                daemon=True
-                            ).start()
-                    else:
-                        print(f"[!] No response from physical device {device_id}")
-                        error_response = {"status": "failed", "message": "No response from device"}
+                        command_data = json.loads(command_json)
+                        action = command_data.get('action')
+                        print(f"[+] Sending command to physical device {device_id}: {action}")
+                        print(f"[+] Full command: {command_json}")
+                        
+                        # Send command to device - will immediately fail if socket is dead
+                        client_socket.sendall(command_json.encode("utf-8"))
+                        print(f"[+] Command sent to socket for {device_id}")
+                        
+                        # Wait for response (with timeout)
+                        client_socket.settimeout(30.0)
+                        response_data = client_socket.recv(4096).decode('utf-8')
+                        client_socket.settimeout(None)
+                        
+                        if response_data:
+                            print(f"[+] Received response from {device_id}: {response_data}")
+                            response = json.loads(response_data)
+                            # Store response in Redis for Flask to retrieve
+                            response_key = f"{device_id}:physical_response"
+                            r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
+                            print(f"[+] Physical device response: {response.get('status')} - {response.get('message')}")
+                            
+                            # IMMEDIATELY refresh device metrics and services after command
+                            # This ensures next API call gets fresh data without waiting for polling
+                            if response.get("status") == "success":
+                                print(f"[+] Refreshing device data for {device_id} after successful command...")
+                                threading.Thread(
+                                    target=refresh_device_data_after_command,
+                                    args=(device_id, client_socket),
+                                    daemon=True
+                                ).start()
+                        else:
+                            print(f"[!] No response from physical device {device_id}")
+                            error_response = {"status": "failed", "message": "No response from device"}
+                            r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+                            
+                    except socket.timeout:
+                        print(f"[!] Timeout waiting for response from {device_id}")
+                        error_response = {"status": "failed", "message": "Timeout"}
                         r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
-                        
-                except socket.timeout:
-                    print(f"[!] Timeout waiting for response from {device_id}")
-                    error_response = {"status": "failed", "message": "Timeout"}
-                    r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
-                except Exception as e:
-                    print(f"[!] Error processing physical command: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    error_response = {"status": "failed", "message": str(e)}
-                    r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
-            
-            # Physical devices: no disconnect command, no queue polling
-            # They stay connected until server stops or connection dies
-            time.sleep(0.2)  # Check for commands more frequently
+                    except json.JSONDecodeError as e:
+                        print(f"[!] Invalid JSON from physical device {device_id}: {e}")
+                        error_response = {"status": "failed", "message": f"Invalid JSON: {str(e)}"}
+                        r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+                    except Exception as e:
+                        print(f"[!] Error processing physical command: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        error_response = {"status": "failed", "message": str(e)}
+                        r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+                
+                # Physical devices: no disconnect command, no queue polling
+                # They stay connected until server stops or connection dies
+                time.sleep(0.2)  # Check for commands more frequently
+                
+            except (socket.error, ConnectionResetError, BrokenPipeError, OSError) as e:
+                print(f"[!] Connection lost to physical device {device_id}: {e}")
+                print(f"[!] Cleaning up physical device {device_id}...")
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
+            except Exception as e:
+                print(f"[!] Unexpected error with physical device {device_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
         return
 
     # Logical devices: poll command queue (existing logic)
@@ -520,8 +540,11 @@ def poll_physical_devices_background():
     """
     Background thread that polls all connected physical devices for metrics and services
     Stores results in Redis cache for instant API access
+    Also detects dead devices that aren't responding to commands
     """
     print("[+] Starting background physical device polling thread...")
+    device_timeout_count = {}  # Track consecutive timeouts per device
+    MAX_TIMEOUTS = 3  # If device times out 3 times in a row, remove it
     
     while True:
         try:
@@ -538,8 +561,19 @@ def poll_physical_devices_background():
             
             devices = json.loads(devices_json)
             
-            for device_id in list(devices.keys()):
+            for device_id in devices.keys():
                 try:
+                    # Skip if we've seen too many timeouts for this device
+                    timeout_count = device_timeout_count.get(device_id, 0)
+                    if timeout_count >= MAX_TIMEOUTS:
+                        print(f"[!] Device {device_id} has timed out {timeout_count} times - removing from connected devices")
+                        del devices[device_id]
+                        r.set("connected_physical_devices", json.dumps(devices))
+                        r.delete(f"{device_id}:cached_metrics")
+                        r.delete(f"{device_id}:cached_devices")
+                        device_timeout_count[device_id] = 0
+                        continue
+                    
                     print(f"[+] Polling physical device {device_id} for metrics...")
                     
                     # Send get_metrics command
@@ -556,18 +590,25 @@ def poll_physical_devices_background():
                     # Wait for response (max 10 seconds)
                     start_time = time.time()
                     metrics_data = None
+                    got_response = False
                     while time.time() - start_time < 10:
                         response_json = r.get(response_key)
                         if response_json:
+                            got_response = True
                             r.delete(response_key)
                             response = json.loads(response_json)
                             if response.get("status") == "success":
                                 metrics_data = response.get("data")
+                                device_timeout_count[device_id] = 0  # Reset timeout counter
                                 break
                             else:
                                 print(f"[!] Metrics failed for {device_id}: {response.get('message')}")
                                 break
                         time.sleep(0.1)
+                    
+                    if not got_response:
+                        device_timeout_count[device_id] = device_timeout_count.get(device_id, 0) + 1
+                        print(f"[!] No response from {device_id} (timeout count: {device_timeout_count[device_id]}/{MAX_TIMEOUTS})")
                     
                     # Cache metrics if response received (even if empty)
                     if metrics_data is not None:
@@ -594,18 +635,25 @@ def poll_physical_devices_background():
                     # Wait for response (max 10 seconds)
                     start_time = time.time()
                     devices_data = None
+                    got_response = False
                     while time.time() - start_time < 10:
                         response_json = r.get(response_key)
                         if response_json:
+                            got_response = True
                             r.delete(response_key)
                             response = json.loads(response_json)
                             if response.get("status") == "success":
                                 devices_data = response.get("data")
+                                device_timeout_count[device_id] = 0  # Reset timeout counter
                                 break
                             else:
                                 print(f"[!] Devices list failed for {device_id}: {response.get('message')}")
                                 break
                         time.sleep(0.1)
+                    
+                    if not got_response:
+                        device_timeout_count[device_id] = device_timeout_count.get(device_id, 0) + 1
+                        print(f"[!] No response from {device_id} for devices list (timeout count: {device_timeout_count[device_id]}/{MAX_TIMEOUTS})")
                     
                     # Cache devices if response received (even if empty list)
                     if devices_data is not None:
