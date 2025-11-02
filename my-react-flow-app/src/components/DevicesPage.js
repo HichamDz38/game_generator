@@ -414,7 +414,14 @@ const DevicesPage = () => {
           No physical devices connected
         </div>
       ) : (
-        Object.entries(physicalDevices).map(([deviceId, deviceData]) => {
+        Object.entries(physicalDevices)
+          .sort(([_, dataA], [__, dataB]) => {
+            // Sort by hostname (e.g., "pi-gaming-1", "pi-gaming-2", etc.)
+            const hostnameA = (dataA.hostname || '').toLowerCase();
+            const hostnameB = (dataB.hostname || '').toLowerCase();
+            return hostnameA.localeCompare(hostnameB);
+          })
+          .map(([deviceId, deviceData]) => {
           const isExpanded = expandedDevices[deviceId];
           const metrics = deviceData.metrics;
           // Ensure services is always an array

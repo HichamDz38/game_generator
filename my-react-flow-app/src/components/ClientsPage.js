@@ -202,7 +202,14 @@ const ClientsPage = () => {
           No devices connected
         </div>
       ) : (
-        Object.entries(devices).map(([deviceId, deviceInfo]) => (
+        Object.entries(devices)
+          .sort(([_, dataA], [__, dataB]) => {
+            // Sort by device_name (e.g., "EPAPER:9.7_2", "scoreboard_1", etc.)
+            const nameA = (dataA.device_name || '').toLowerCase();
+            const nameB = (dataB.device_name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          })
+          .map(([deviceId, deviceInfo]) => (
           <div key={deviceId} className={styles.scenariosbox}>
             <div style={{ flex: 1 }}>
               <div className={styles.name_scenario}>

@@ -361,7 +361,14 @@ function Sidebar({nodeData, onLoadScenario, onNodeClick, existingNodes = []}) {
         <div className={styles.titledev2}>Drag devices to create Scenario</div>
         <br></br><br></br>
         {Object.keys(devices).length > 0 ? (
-          Object.entries(devices).map(([deviceId, deviceData]) => {
+          Object.entries(devices)
+            .sort(([_, dataA], [__, dataB]) => {
+              // Sort by device_name (e.g., "EPAPER:9.7_2", "scoreboard_1", etc.)
+              const nameA = (dataA.device_name || '').toLowerCase();
+              const nameB = (dataB.device_name || '').toLowerCase();
+              return nameA.localeCompare(nameB);
+            })
+            .map(([deviceId, deviceData]) => {
             const uniqueId = generateUniqueId();
             
             return (
