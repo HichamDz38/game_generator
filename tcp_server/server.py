@@ -291,10 +291,28 @@ def handle_client(client_socket, addr):
     device_id = None
     num_nodes = 1
     try:
-        device_info = json.loads(client_socket.recv(4096).decode('utf-8'))
+        # Set a timeout for receiving initial device info (prevent hanging on stale connections)
+        client_socket.settimeout(5.0)
+        device_info_raw = client_socket.recv(4096).decode('utf-8')
+        client_socket.settimeout(None)  # Reset to blocking after initial handshake
+        
+        if not device_info_raw or device_info_raw.strip() == "":
+            print(f"[!] Empty device info from {addr} - ignoring stale connection")
+            client_socket.close()
+            return
+        
+        device_info = json.loads(device_info_raw)
         device_id, num_nodes, is_physical = register_device(device_info, addr, client_socket)
+    except socket.timeout:
+        print(f"[!] Timeout receiving initial device info from {addr} - stale connection")
+        client_socket.close()
+        return
+    except json.JSONDecodeError as e:
+        print(f"[!] Invalid JSON from {addr}: {e} - stale connection")
+        client_socket.close()
+        return
     except Exception as e:
-        print(f"[!] Error receiving initial device info: {e}")
+        print(f"[!] Error receiving initial device info from {addr}: {e}")
         client_socket.close()
         if device_id:
             cleanup_device(device_id, num_nodes)
