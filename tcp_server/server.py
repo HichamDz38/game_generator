@@ -218,9 +218,13 @@ def refresh_device_data_after_command(device_id, client_socket):
         metrics_command = {"action": "get_metrics", "params": {}}
         client_socket.sendall(json.dumps(metrics_command).encode("utf-8"))
         
+        # Set timeout for this specific recv call
+        original_timeout = client_socket.gettimeout()
         client_socket.settimeout(10.0)
-        response_data = client_socket.recv(4096).decode('utf-8')
-        client_socket.settimeout(None)
+        try:
+            response_data = client_socket.recv(4096).decode('utf-8')
+        finally:
+            client_socket.settimeout(original_timeout)
         
         if response_data:
             response = json.loads(response_data)
@@ -236,9 +240,12 @@ def refresh_device_data_after_command(device_id, client_socket):
         services_command = {"action": "list_devices", "params": {}}
         client_socket.sendall(json.dumps(services_command).encode("utf-8"))
         
+        # Set timeout for this specific recv call
         client_socket.settimeout(10.0)
-        response_data = client_socket.recv(4096).decode('utf-8')
-        client_socket.settimeout(None)
+        try:
+            response_data = client_socket.recv(4096).decode('utf-8')
+        finally:
+            client_socket.settimeout(original_timeout)
         
         if response_data:
             response = json.loads(response_data)
@@ -277,18 +284,22 @@ def handle_client(client_socket, addr):
         print(f"[+] TCP keepalive enabled for {addr}")
     except AttributeError:
         # Not all platforms support these options
-        print(f"[!] Platform doesn't support TCP keepalive configuration, using defaults")
+        print("[!] Platform doesn't support TCP keepalive configuration, using defaults")
     
-    # No socket timeout - let keepalive handle dead connections
-    # This prevents timeout errors during long waits for commands
+    # Keep socket in BLOCKING mode (default) - do NOT set to non-blocking
+    # recv() with timeout is better than non-blocking mode for our use case
+    client_socket.setblocking(True)
     
+    device_id = None
+    num_nodes = 1
     try:
         device_info = json.loads(client_socket.recv(4096).decode('utf-8'))
         device_id, num_nodes, is_physical = register_device(device_info, addr, client_socket)
     except Exception as e:
         print(f"[!] Error receiving initial device info: {e}")
         client_socket.close()
-        cleanup_device(device_id, num_nodes)
+        if device_id:
+            cleanup_device(device_id, num_nodes)
         return
 
     # Physical devices: just wait for direct commands (no queue polling, no disconnect)
@@ -383,6 +394,8 @@ def handle_client(client_socket, addr):
 
     # Logical devices: poll command queue (existing logic)
     index = 0
+    logical_device_timeout_count = {}  # Track timeouts per node
+    MAX_LOGICAL_TIMEOUTS = 5  # More lenient for logical devices (no keepalive probe)
     
     while True:
         # Check if server is stopping
@@ -403,16 +416,39 @@ def handle_client(client_socket, addr):
         
         try:
             command = get_command_for_device(device_id, num_nodes, index)
+            
+            # Check timeout status for this node
+            if num_nodes > 1:
+                node_instance_id = f"{device_id}_{index+1}"
+            else:
+                node_instance_id = device_id
+            
+            timeout_count = logical_device_timeout_count.get(node_instance_id, 0)
+            if timeout_count >= MAX_LOGICAL_TIMEOUTS:
+                print(f"[!] Logical device {node_instance_id} has timed out {timeout_count} times - disconnecting")
+                client_socket.close()
+                cleanup_device(device_id, num_nodes)
+                break
                 
             if command:
-                process_command(client_socket, command, index)
+                try:
+                    process_command(client_socket, command, index)
+                    # Reset timeout on successful command
+                    logical_device_timeout_count[node_instance_id] = 0
+                except socket.timeout:
+                    # Track timeout but don't fail immediately
+                    logical_device_timeout_count[node_instance_id] = timeout_count + 1
+                    print(f"[!] No response from {node_instance_id} (timeout count: {logical_device_timeout_count[node_instance_id]}/{MAX_LOGICAL_TIMEOUTS})")
+            else:
+                # No command - reset timeout since device is responding to polls
+                logical_device_timeout_count[node_instance_id] = 0
             
             if num_nodes > 1:
                 index = (index+1) % num_nodes
                 
         except (socket.error, ConnectionResetError, BrokenPipeError, ConnectionError) as e:
             print(f"[!] Communication error with device {device_id}: {e}")
-            print(f"[!] Marking all pending operations as failed")
+            print("[!] Marking all pending operations as failed")
             
             # Mark any in-progress operations as failed
             if num_nodes > 1:
@@ -425,7 +461,7 @@ def handle_client(client_socket, addr):
                             cmd_data = json.loads(cmd)
                             if cmd_data.get('node_id'):
                                 r.set(f"flow_execution:{cmd_data['node_id']}", "failed")
-                        except:
+                        except Exception:
                             pass
             else:
                 # Check for any pending commands and mark as failed
@@ -435,7 +471,7 @@ def handle_client(client_socket, addr):
                         cmd_data = json.loads(cmd)
                         if cmd_data.get('node_id'):
                             r.set(f"flow_execution:{cmd_data['node_id']}", "failed")
-                    except:
+                    except Exception:
                         pass
             
             client_socket.close()
