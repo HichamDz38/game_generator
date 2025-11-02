@@ -59,11 +59,6 @@ const DevicesPage = () => {
   const handleRestartPi = async (deviceId) => {
     console.log('[DEBUG] handleRestartPi called with deviceId:', deviceId);
     console.log('[DEBUG] API_BASE_URL:', API_BASE_URL);
-    
-    if (!window.confirm(`⚠️ WARNING: This will RESTART the entire Raspberry Pi (${deviceId}).\n\nAll services will be stopped and the device will reboot.\n\nAre you sure?`)) {
-      console.log('[DEBUG] User cancelled restart');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -75,14 +70,13 @@ const DevicesPage = () => {
       console.log('Restart Pi response:', response.data);
       
       if (response.data.status === 'success') {
-        alert('✓ Raspberry Pi restart initiated. Device will reconnect in ~60 seconds.');
+        console.log('✓ Raspberry Pi restart initiated for', deviceId);
       } else {
-        alert(`✗ Failed to restart Pi: ${response.data.message}`);
+        console.error(`✗ Failed to restart Pi: ${response.data.message}`);
       }
     } catch (error) {
       console.error('Error restarting Pi:', error);
       console.error('Error details:', error.response?.data);
-      alert(`✗ Error restarting Pi: ${error.response?.data?.message || error.message}`);
     }
     setLoading(false);
   };
@@ -93,12 +87,6 @@ const DevicesPage = () => {
     console.log('Service Name:', serviceName);
     console.log('Action:', action);
     
-    const actionText = action === 'restart' ? 'Restart' : action === 'stop' ? 'Stop' : 'Start';
-    
-    if (!window.confirm(`${actionText} service "${serviceName}" on ${deviceId}?`)) {
-      return;
-    }
-
     setLoading(true);
     try {
       console.log(`Sending ${action} command to ${deviceId} for service: ${serviceName}`);
@@ -110,16 +98,15 @@ const DevicesPage = () => {
       console.log('Service action response:', response.data);
       
       if (response.data.status === 'success') {
-        alert(`✓ ${actionText} successful: ${response.data.message}`);
+        console.log(`✓ ${action} successful: ${response.data.message}`);
         // Refresh all data to update service status
         await fetchAllDeviceData();
       } else {
-        alert(`✗ ${actionText} failed: ${response.data.message}`);
+        console.error(`✗ ${action} failed: ${response.data.message}`);
       }
     } catch (error) {
       console.error(`Error ${action} service:`, error);
       console.error('Error response:', error.response?.data);
-      alert(`✗ Error ${action} service: ${error.response?.data?.message || error.message}`);
     }
     setLoading(false);
   };
@@ -135,13 +122,7 @@ const DevicesPage = () => {
     });
 
     if (allServices.length === 0) {
-      alert('No services found to control');
-      return;
-    }
-
-    const actionText = action === 'restart' ? 'Restart' : action === 'stop' ? 'Stop' : 'Start';
-    
-    if (!window.confirm(`${actionText} ALL ${allServices.length} service(s) across ${Object.keys(physicalDevices).length} device(s)?\n\nThis will affect all client devices.`)) {
+      console.log('No services found to control');
       return;
     }
 
@@ -171,16 +152,7 @@ const DevicesPage = () => {
     }
 
     setLoading(false);
-
-    // Show results
-    let message = `${actionText} completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
-    if (errors.length > 0 && errors.length <= 5) {
-      message += '\n\nErrors:\n' + errors.join('\n');
-    } else if (errors.length > 5) {
-      message += '\n\nShowing first 5 errors:\n' + errors.slice(0, 5).join('\n');
-    }
-    alert(message);
-
+    console.log(`${action} completed: Success=${successCount}, Failed=${failCount}`);
     // Refresh all data
     await fetchAllDeviceData();
   };
@@ -192,11 +164,7 @@ const DevicesPage = () => {
       .map(([deviceId, _]) => deviceId);
     
     if (clientDeviceIds.length === 0) {
-      alert('No client devices to restart');
-      return;
-    }
-
-    if (!window.confirm(`⚠️ WARNING: This will RESTART ALL ${clientDeviceIds.length} Raspberry Pi device(s).\n\nAll services on client devices will be stopped and devices will reboot.\n\n✓ Central server will NOT be affected\n\nAre you sure?`)) {
+      console.log('No client devices to restart');
       return;
     }
 
@@ -226,17 +194,7 @@ const DevicesPage = () => {
     }
 
     setLoading(false);
-
-    // Show results
-    let message = `Restart All Client Pis completed:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}`;
-    if (errors.length > 0 && errors.length <= 5) {
-      message += '\n\nErrors:\n' + errors.join('\n');
-    } else if (errors.length > 5) {
-      message += '\n\nShowing first 5 errors:\n' + errors.slice(0, 5).join('\n');
-    }
-    message += '\n\n✓ Central server was NOT restarted\n\nClient devices will reconnect in ~60 seconds.';
-    alert(message);
-
+    console.log(`Restart All Pis completed: Success=${successCount}, Failed=${failCount}`);
     // Refresh all data
     await fetchAllDeviceData();
   };
@@ -283,7 +241,7 @@ const DevicesPage = () => {
           borderRadius: '8px',
           border: '2px solid #ddd'
         }}>
-          {/* Client Services Control */}
+          {/* Bulk Control Panel - Client Services & Physical Devices */}
           <div style={{ marginBottom: '15px' }}>
             <div style={{ 
               fontSize: '14px', 
@@ -291,7 +249,7 @@ const DevicesPage = () => {
               color: '#333',
               marginBottom: '10px'
             }}>
-              🎛️ Control All Client Services
+              🎛️ Bulk Control
             </div>
             <div style={{ 
               display: 'flex', 
@@ -299,6 +257,7 @@ const DevicesPage = () => {
               justifyContent: 'center',
               flexWrap: 'wrap'
             }}>
+              {/* Client Services */}
               <button 
                 className={styles.theme__button}
                 onClick={() => handleBulkServiceAction('start')}
@@ -309,6 +268,7 @@ const DevicesPage = () => {
                   background: '#4caf50',
                   minWidth: '120px'
                 }}
+                title="Start all client services"
               >
                 ▶️ Start All
               </button>
@@ -322,6 +282,7 @@ const DevicesPage = () => {
                   background: '#ff9800',
                   minWidth: '120px'
                 }}
+                title="Restart all client services"
               >
                 🔄 Restart All
               </button>
@@ -334,43 +295,19 @@ const DevicesPage = () => {
                   padding: '8px 20px',
                   minWidth: '120px'
                 }}
+                title="Stop all client services"
               >
                 ⏹️ Stop All
               </button>
-            </div>
-            <div style={{ 
-              marginTop: '8px', 
-              fontSize: '12px', 
-              color: '#666',
-              fontStyle: 'italic'
-            }}>
-              These actions will affect all client services across all connected devices
-            </div>
-          </div>
 
-          {/* Separator */}
-          <div style={{ 
-            height: '1px', 
-            background: '#ddd', 
-            margin: '15px 0'
-          }}></div>
+              {/* Separator line */}
+              <div style={{ 
+                width: '1px', 
+                background: '#ddd', 
+                margin: '0 5px'
+              }}></div>
 
-          {/* Physical Device Control */}
-          <div>
-            <div style={{ 
-              fontSize: '14px', 
-              fontWeight: 'bold', 
-              color: '#d32f2f',
-              marginBottom: '10px'
-            }}>
-              🖥️ Control Physical Devices (Pi)
-            </div>
-            <div style={{ 
-              display: 'flex', 
-              gap: '10px', 
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
+              {/* Physical Devices */}
               <button 
                 className={styles.delete}
                 onClick={handleRestartAllPis}
@@ -380,6 +317,7 @@ const DevicesPage = () => {
                   padding: '8px 20px',
                   minWidth: '140px'
                 }}
+                title="Reboot all Raspberry Pi(s) - server unaffected"
               >
                 ⚠️ Restart All Pis
               </button>
@@ -387,13 +325,16 @@ const DevicesPage = () => {
             <div style={{ 
               marginTop: '8px', 
               fontSize: '12px', 
-              color: '#d32f2f',
-              fontStyle: 'italic',
-              fontWeight: 'bold'
+              color: '#666',
+              fontStyle: 'italic'
             }}>
-              ⚠️ WARNING: This will reboot all client Raspberry Pi(s) immediately!
-              <br />
-              ✓ Central server will NOT be affected
+              <span style={{ color: '#333' }}>
+                Left section: Client services across all devices
+              </span>
+              {' • '}
+              <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+                Right: ⚠️ Reboot all Pis (server safe)
+              </span>
             </div>
           </div>
         </div>
