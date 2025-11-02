@@ -1,6 +1,7 @@
 
-# Use Node.js official image
-FROM node:18-alpine
+# Use Node.js 20 official image (LTS)
+# Updated from 18 to support React Router v7.8.0
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
