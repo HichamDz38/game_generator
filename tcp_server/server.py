@@ -340,6 +340,7 @@ def handle_client(client_socket, addr):
                         
                         command_data = json.loads(command_json)
                         action = command_data.get('action')
+                        response_key = command_data.get('response_key', f"{device_id}:physical_response")  # Use response_key from command if present
                         print(f"[+] Sending command to physical device {device_id}: {action}")
                         print(f"[+] Full command: {command_json}")
                         
@@ -355,14 +356,13 @@ def handle_client(client_socket, addr):
                         if response_data:
                             print(f"[+] Received response from {device_id}: {response_data}")
                             response = json.loads(response_data)
-                            # Store response in Redis for Flask to retrieve
-                            response_key = f"{device_id}:physical_response"
+                            # Store response in Redis for Flask or polling thread to retrieve
                             r.setex(response_key, 60, json.dumps(response))  # Expire after 60s
                             print(f"[+] Physical device response: {response.get('status')} - {response.get('message')}")
                             
-                            # IMMEDIATELY refresh device metrics and services after command
+                            # IMMEDIATELY refresh device metrics and services after command (only for direct API commands, not polling)
                             # This ensures next API call gets fresh data without waiting for polling
-                            if response.get("status") == "success":
+                            if response.get("status") == "success" and "poll" not in response_key:
                                 print(f"[+] Refreshing device data for {device_id} after successful command...")
                                 threading.Thread(
                                     target=refresh_device_data_after_command,
@@ -372,7 +372,7 @@ def handle_client(client_socket, addr):
                         else:
                             print(f"[!] No response from physical device {device_id}")
                             error_response = {"status": "failed", "message": "No response from device"}
-                            r.setex(f"{device_id}:physical_response", 60, json.dumps(error_response))
+                            r.setex(response_key, 60, json.dumps(error_response))
                             
                     except socket.timeout:
                         print(f"[!] Timeout waiting for response from {device_id}")
@@ -631,7 +631,7 @@ def poll_physical_devices_background():
                     # Send get_metrics command
                     metrics_command = {"action": "get_metrics", "params": {}}
                     command_key = f"{device_id}:physical_command"
-                    response_key = f"{device_id}:physical_response"
+                    response_key = f"{device_id}:physical_response:poll_metrics"  # Use separate key to avoid race conditions
                     
                     # Clear old response
                     r.delete(response_key)
@@ -677,6 +677,7 @@ def poll_physical_devices_background():
                     # Send list_devices command
                     print(f"[+] Polling physical device {device_id} for client devices...")
                     devices_command = {"action": "list_devices", "params": {}}
+                    response_key = f"{device_id}:physical_response:poll_devices"  # Use separate key to avoid race conditions
                     
                     # Clear old response
                     r.delete(response_key)
