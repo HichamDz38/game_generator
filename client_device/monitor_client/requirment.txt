@@ -1,4 +1,0 @@
-lgpio==0.2.2.0
-pillow==11.3.0
-pygame==2.1.2
-numpy==2.1.1
