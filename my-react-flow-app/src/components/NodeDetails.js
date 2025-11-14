@@ -6,6 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, position  }) {
   const containerRef = useRef(null);
   const [imagePreviews, setImagePreviews] = useState({});
+  const [videoPreviews, setVideoPreviews] = useState({});
   const [uploading, setUploading] = useState({});
   const [uploadStatus, setUploadStatus] = useState({});
   const [connectedSources, setConnectedSources] = useState([]);
@@ -36,6 +37,7 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
     if (!nodeData || !nodeData.data?.config) return;
 
     const previews = {};
+    const videoPrevs = {};
     const values = {};
     const conditionals = {};
 
@@ -46,18 +48,28 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
       }
 
       if (config.type === 'file' && config.value) {
-        if (config.value.startsWith('data:image/')) {
-          previews[key] = config.value;
-        } else {
-          const imageUrl = config.value.startsWith('/static/uploads/')
+        // Check if it's a video field based on accept attribute
+        if (config.accept === 'video/*') {
+          const videoUrl = config.value.startsWith('/static/uploads/')
             ? `${API_BASE_URL}${config.value}`
             : config.value;
-          previews[key] = imageUrl;
+          videoPrevs[key] = videoUrl;
+        } else {
+          // Image field (existing logic)
+          if (config.value.startsWith('data:image/')) {
+            previews[key] = config.value;
+          } else {
+            const imageUrl = config.value.startsWith('/static/uploads/')
+              ? `${API_BASE_URL}${config.value}`
+              : config.value;
+            previews[key] = imageUrl;
+          }
         }
       }
     });
 
     setImagePreviews(previews);
+    setVideoPreviews(videoPrevs);
     setConfigValues(values);
     setConditionalFields(conditionals);
 
@@ -176,6 +188,48 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
         delete nodeData.data.config[fieldName].tempDataUrl;
         const fullImageUrl = `${API_BASE_URL}${data.imageUrl}`;
         setImagePreviews(prev => ({ ...prev, [fieldName]: fullImageUrl }));
+        setUploadStatus(prev => ({ ...prev, [fieldName]: 'success' }));
+        setTimeout(() => setUploadStatus(prev => { const n = { ...prev }; delete n[fieldName]; return n; }), 2000);
+      } else {
+        setUploadStatus(prev => ({ ...prev, [fieldName]: 'error' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setUploadStatus(prev => ({ ...prev, [fieldName]: 'error' }));
+    }
+
+    setUploading(prev => ({ ...prev, [fieldName]: false }));
+  };
+
+  const handleVideoChange = async (e, fieldName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Create video preview using object URL
+    const videoUrl = URL.createObjectURL(file);
+    setVideoPreviews(prev => ({ ...prev, [fieldName]: videoUrl }));
+    if (nodeData.data.config[fieldName]) {
+      nodeData.data.config[fieldName].tempVideoUrl = videoUrl;
+    }
+
+    setUploading(prev => ({ ...prev, [fieldName]: true }));
+    setUploadStatus(prev => ({ ...prev, [fieldName]: 'uploading' }));
+
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('nodeId', nodeData.id);
+      formData.append('scenarioName', scenarioName);
+      formData.append('fieldName', fieldName);
+
+      const response = await fetch(`${API_BASE_URL}/upload-video`, { method: 'POST', body: formData });
+
+      if (response.ok) {
+        const data = await response.json();
+        nodeData.data.config[fieldName].value = data.videoUrl;
+        delete nodeData.data.config[fieldName].tempVideoUrl;
+        const fullVideoUrl = `${API_BASE_URL}${data.videoUrl}`;
+        setVideoPreviews(prev => ({ ...prev, [fieldName]: fullVideoUrl }));
         setUploadStatus(prev => ({ ...prev, [fieldName]: 'success' }));
         setTimeout(() => setUploadStatus(prev => { const n = { ...prev }; delete n[fieldName]; return n; }), 2000);
       } else {
@@ -336,7 +390,14 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
             type="file"
             name={key}
             accept={config.accept || 'image/*'}
-            onChange={e => handleFileChange(e, key)}
+            onChange={e => {
+              // Route to appropriate handler based on accept attribute
+              if (config.accept === 'video/*') {
+                handleVideoChange(e, key);
+              } else {
+                handleFileChange(e, key);
+              }
+            }}
             disabled={uploading[key]}
             className={styles.hiddenFileInput}
             required={isRequired}
@@ -351,6 +412,18 @@ function NodeDetails({ nodeData, onClose, onUpdate, scenarioName, nodes, edges, 
               className={styles.imagePreview}
               onError={e => e.target.style.display='none'}
             />
+          </div>
+        )}
+        {videoPreviews[key] && (
+          <div className={styles.videoPreviewContainer}>
+            <video
+              src={videoPreviews[key]}
+              controls
+              className={styles.videoPreview}
+              style={{ maxWidth: '300px', maxHeight: '200px' }}
+            >
+              Your browser does not support video preview.
+            </video>
           </div>
         )}
         {hasError && <span className={styles.errorMessage}>{validationErrors[key]}</span>}

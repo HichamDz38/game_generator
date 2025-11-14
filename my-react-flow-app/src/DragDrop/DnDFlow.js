@@ -82,6 +82,9 @@ const DnDFlow = ({scenarioToLoad, onScenarioSaved, onFlowRunningChange }) => {
   const [isStart, setisStart] = useState(false);
   const completionStateRef = useRef({ completedNodes: [], failedNodes: [] });
   const [isPaused, setIsPaused] = useState(false);
+  const [pausedDueToError, setPausedDueToError] = useState(false);
+  const [failedNodeId, setFailedNodeId] = useState(null); // Track which node failed
+  const skipRequestedRef = useRef(false); // Track if skip was requested
 
 
   const customOnNodesChange = useCallback((changes) => {
@@ -348,6 +351,7 @@ const executionStateRef = useRef(executionState);
       };
     });
 
+    // Set node to red (failed) and PAUSE the scenario
     setNodes(nds => nds.map(n => ({
       ...n,
       style: n.id === node.id 
@@ -355,7 +359,63 @@ const executionStateRef = useRef(executionState);
         : n.style
     })));
 
-    throw error;
+    // Auto-pause on error to allow physical inspection
+    console.log(`[${pathId}] Auto-pausing scenario due to error in node ${node.data.label}`);
+    setIsPaused(true);
+    isPausedRef.current = true;
+    setPausedDueToError(true);
+    setFailedNodeId(node.id);
+    skipRequestedRef.current = false; // Reset skip flag
+    
+    console.warn(`⚠️ Scenario paused due to error in "${node.data.label}": ${error.message}`);
+    
+    // Wait for user action (RETRY via resume button, SKIP via skip button, or STOP via stop button)
+    while (isPausedRef.current && isRunningRef.current) {
+      // Check if skip was requested
+      if (skipRequestedRef.current) {
+        console.log(`[${pathId}] Skip requested for node ${node.data.label}`);
+        skipRequestedRef.current = false;
+        
+        // Set node to orange (skipped)
+        setNodes(nds => nds.map(n => ({
+          ...n,
+          style: n.id === node.id 
+            ? { ...n.style, backgroundColor: '#ff9800', border: '2px solid #f57c00' }
+            : n.style
+        })));
+        
+        // Return true to continue flow (skip this node)
+        return true;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (!isRunningRef.current) {
+        throw new Error('Execution was stopped while paused');
+      }
+    }
+    
+    // If we reach here, user clicked RETRY (resume button)
+    console.log(`[${pathId}] User clicked RETRY - retrying node ${node.data.label}`);
+    
+    // Clear failed status and error flag before retry
+    setPausedDueToError(false);
+    setFailedNodeId(null);
+    updateExecutionState(prev => ({
+      ...prev,
+      failedNodes: prev.failedNodes.filter(id => id !== node.id)
+    }));
+    
+    // Reset node color to yellow (in progress)
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      style: n.id === node.id 
+        ? { ...n.style, backgroundColor: '#ffeb3b', border: '2px solid #ff9800' }
+        : n.style
+    })));
+    
+    // Retry the node (recursive call)
+    return await executeNode(node, pathId);
   }
 };
 
@@ -876,6 +936,33 @@ const stopAllDevices = useCallback(async () => {
   }
 }, []);
 
+// Helper function to restart all device services (calls stop_all endpoint)
+const restartAllDeviceServices = useCallback(async () => {
+  console.log('🔄 Restarting all device services...');
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/stop_all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Failed to restart device services');
+      return;
+    }
+    
+    const result = await response.json();
+    
+    if (result.status === 'success') {
+      console.log(`✅ All device services restarted - ${result.devices_reconnected} devices reconnected in ${result.reconnect_time}s`);
+    } else if (result.status === 'timeout') {
+      console.warn(`⚠️ Some devices failed to reconnect: ${result.devices_missing} missing`);
+    }
+  } catch (error) {
+    console.error('❌ Error restarting device services:', error);
+  }
+}, []);
+
 // Helper function to check if a node is downstream from specific source nodes
 const isDownstreamFrom = (targetNodeId, sourceNodeIds, edges, nodes) => {
   const visited = new Set();
@@ -1266,6 +1353,27 @@ const executeConditionNode = async (node, pathId = null) => {
 };
 
   const handleStartExecution = async () => {
+  console.log('Starting scenario execution...');
+  
+  // First, clear all pending commands from all devices
+  try {
+    console.log('Clearing all pending commands from devices...');
+    const clearResponse = await fetch(`${API_BASE_URL}/clear_all_commands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (clearResponse.ok) {
+      const clearResult = await clearResponse.json();
+      console.log(`✅ Cleared commands for ${clearResult.devices_cleared} devices`);
+    } else {
+      console.warn('⚠️ Failed to clear commands, continuing anyway...');
+    }
+  } catch (error) {
+    console.error('❌ Error clearing commands:', error);
+    // Continue anyway - don't block execution
+  }
+  
   setisStart(true);
   isRunningRef.current = true;
   
@@ -1307,10 +1415,11 @@ const executeConditionNode = async (node, pathId = null) => {
     
     console.log('Flow execution completed normally');
     
-    setNodes(nds => nds.map(n => ({
-      ...n,
-      style: { ...n.style, backgroundColor: undefined, border: undefined }
-    })));
+    // Keep node colors - don't clear them
+    // setNodes(nds => nds.map(n => ({
+    //   ...n,
+    //   style: { ...n.style, backgroundColor: undefined, border: undefined }
+    // })));
     
     updateExecutionState(prev => ({
       ...prev,
@@ -1323,7 +1432,11 @@ const executeConditionNode = async (node, pathId = null) => {
       }]
     }));
     
-    alert('Flow execution completed successfully!');
+    // No alert dialog - just log completion
+    console.log('✅ Flow execution completed successfully!');
+    
+    // Restart all device services after completion
+    await restartAllDeviceServices();
 
   } catch (error) {
     console.error('Flow execution failed:', error);
@@ -1355,6 +1468,7 @@ const executeConditionNode = async (node, pathId = null) => {
   isRunningRef.current = false;
   setIsPaused(false);
   isPausedRef.current = false;
+  setPausedDueToError(false);  // Clear error flag
   
   setNodes(nds => nds.map(n => ({
     ...n,
@@ -1374,7 +1488,9 @@ const executeConditionNode = async (node, pathId = null) => {
 
 
 
-  const handleStopExecution = () => {
+  const handleStopExecution = async () => {
+  console.log('Stopping execution and restarting all device services...');
+  
   setNodes(nds => nds.map(n => ({
     ...n,
     style: { ...n.style, backgroundColor: undefined, border: undefined }
@@ -1382,6 +1498,7 @@ const executeConditionNode = async (node, pathId = null) => {
   
   setIsPaused(false); 
   isPausedRef.current = false;
+  setPausedDueToError(false);  // Clear error flag
   
   resetFlowState();
   
@@ -1395,18 +1512,24 @@ const executeConditionNode = async (node, pathId = null) => {
   }));
 
   console.log('Flow execution stopped by user');
+  
+  // Restart all device services
+  await restartAllDeviceServices();
 };
 
   const handlePauseExecution = async () => {
   if (isPaused) {
-    console.log('Resuming execution...');
+    console.log('Resuming/Retrying execution...');
     setIsPaused(false);
+    isPausedRef.current = false;
+    
+    // Don't clear pausedDueToError here - it will be cleared in executeNode after retry
     
     updateExecutionState(prev => ({
       ...prev,
       executionLog: [...prev.executionLog, {
         type: 'info',
-        message: 'Execution resumed',
+        message: pausedDueToError ? 'Retrying failed node' : 'Execution resumed',
         timestamp: new Date()
       }]
     }));
@@ -1414,6 +1537,7 @@ const executeConditionNode = async (node, pathId = null) => {
   } else {
     console.log('Pausing execution...');
     setIsPaused(true);
+    isPausedRef.current = true;
     
     updateExecutionState(prev => ({
       ...prev,
@@ -1425,6 +1549,38 @@ const executeConditionNode = async (node, pathId = null) => {
     }));
   }
 };
+
+  const handleSkipFailedNode = () => {
+  if (!pausedDueToError || !failedNodeId) {
+    console.warn('Skip called but not in error state');
+    return;
+  }
+  
+  console.log(`Skip requested for failed node ${failedNodeId}`);
+  
+  // Set the skip flag - the error handler will detect it
+  skipRequestedRef.current = true;
+  
+  // Remove from failed nodes list
+  updateExecutionState(prev => ({
+    ...prev,
+    failedNodes: prev.failedNodes.filter(id => id !== failedNodeId),
+    executionLog: [...prev.executionLog, {
+      type: 'warning',
+      nodeId: failedNodeId,
+      nodeName: nodes.find(n => n.id === failedNodeId)?.data?.label || failedNodeId,
+      timestamp: new Date(),
+      message: `Skipped failed node`,
+    }]
+  }));
+  
+  // Clear pause state so the waiting loop exits
+  setPausedDueToError(false);
+  setFailedNodeId(null);
+  setIsPaused(false);
+  isPausedRef.current = false;
+};
+
 
 
   const onNodeClick = (e, clickedNode) => {
@@ -1818,10 +1974,11 @@ useEffect(() => {
       
       stopAllActiveExecutions();
       
-      setNodes(nds => nds.map(n => ({
-        ...n,
-        style: { ...n.style, backgroundColor: undefined, border: undefined }
-      })));
+      // Keep node colors - don't clear them
+      // setNodes(nds => nds.map(n => ({
+      //   ...n,
+      //   style: { ...n.style, backgroundColor: undefined, border: undefined }
+      // })));
       
       updateExecutionState(prev => ({
         ...prev,
@@ -1842,8 +1999,12 @@ useEffect(() => {
       setisStart(false);
       isRunningRef.current = false;
       
+      // No alert dialog - just log and restart services
+      console.log('✅ Flow execution completed successfully based on condition outcomes!');
+      
+      // Restart all device services after completion
       setTimeout(() => {
-        alert('Flow execution completed successfully based on condition outcomes!');
+        restartAllDeviceServices();
       }, 300);
     }
   }
@@ -1856,6 +2017,7 @@ useEffect(() => {
   checkForFlowCompletion, 
   updateExecutionState,
   stopAllActiveExecutions,
+  restartAllDeviceServices,
   nodes,
   setNodes
 ]);
@@ -1947,8 +2109,12 @@ useEffect(() => {
             </button>
           )}
 
-          {!isEditable && executionState.isRunning && !isPaused &&(
-            <button className={styles.theme__button}>
+          {!isEditable && executionState.isRunning && pausedDueToError && (
+            <button 
+              className={styles.theme__button}
+              onClick={handleSkipFailedNode}
+              style={{ backgroundColor: '#ff9800' }}
+            >
               SKIP
             </button>
           )}
@@ -1957,8 +2123,9 @@ useEffect(() => {
           <button 
             className={styles.theme__button} 
             onClick={handlePauseExecution}
+            style={pausedDueToError ? { backgroundColor: '#f44336', fontWeight: 'bold' } : {}}
           >
-            {isPaused ? 'RESUME' : 'PAUSE'}
+            {isPaused ? (pausedDueToError ? 'RETRY' : 'RESUME') : 'PAUSE'}
           </button>
         )}
 

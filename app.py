@@ -22,13 +22,19 @@ redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size for images
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+app.config['ALLOWED_VIDEO_EXTENSIONS'] = {'mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'}
+app.config['MAX_VIDEO_SIZE'] = 100 * 1024 * 1024  # 100MB max for videos
 
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+def allowed_video_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_VIDEO_EXTENSIONS']
 
 CORS(app)
 
@@ -298,6 +304,40 @@ def reset_all():
         for device_id in devices.keys():
             redis_client.lpush(f'{device_id}:commands', "reset")
     return jsonify({'status': 'success'})
+
+@app.route('/clear_all_commands', methods=['POST'])
+def clear_all_commands():
+    """Clear all pending commands from all connected devices"""
+    try:
+        connected_dev = redis_client.get("connected_devices")
+        if not connected_dev:
+            return jsonify({
+                'status': 'success',
+                'message': 'No devices connected',
+                'devices_cleared': 0
+            }), 200
+        
+        devices = json.loads(connected_dev.replace("'", '"'))
+        cleared_count = 0
+        
+        for device_id in devices.keys():
+            # Delete the entire command queue for each device
+            redis_client.delete(f'{device_id}:commands')
+            cleared_count += 1
+        
+        logger.info(f"Cleared command queues for {cleared_count} devices")
+        return jsonify({
+            'status': 'success',
+            'message': f'Cleared commands for {cleared_count} devices',
+            'devices_cleared': cleared_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error clearing commands: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to clear commands: {str(e)}'
+        }), 500
 
 @app.route('/stop_all', methods=['POST'])
 def stop_all():
@@ -608,6 +648,53 @@ def upload_image():
         }), 200
     
     return jsonify({'error': 'Invalid file type'}), 400
+
+
+@app.route('/upload-video', methods=['POST'])
+def upload_video():
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file provided'}), 400
+    
+    file = request.files['video']
+    if file.filename == '':
+        return jsonify({'error': 'No video file selected'}), 400
+    
+    # Check file size for videos (allow up to 100MB)
+    if file and allowed_video_file(file.filename):
+        filename = secure_filename(file.filename)
+        field_name = request.form.get('fieldName', '')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{field_name}_{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        file.save(filepath)
+        video_url = f"/static/uploads/{unique_filename}"
+        
+        node_id = request.form.get('nodeId')
+        scenario_name = request.form.get('scenarioName')
+        field_name = request.form.get('fieldName')
+        
+        if node_id and scenario_name and field_name:
+            scenario_key = f"scenario_{scenario_name}"
+            scenario_data = redis_client.get(scenario_key)
+            
+            if scenario_data:
+                scenario_data = json.loads(scenario_data)
+                for node in scenario_data.get('nodes', []):
+                    if (node['id'] == node_id and 
+                        'config' in node.get('data', {}) and 
+                        field_name in node['data']['config']):
+                        node['data']['config'][field_name]['value'] = video_url
+                
+                redis_client.set(scenario_key, json.dumps(scenario_data))
+        
+        return jsonify({
+            'message': 'Video uploaded successfully',
+            'videoUrl': video_url,
+            'fieldName': field_name
+        }), 200
+    
+    return jsonify({'error': 'Invalid video file type'}), 400
 
 
 @app.route('/static/uploads/<path:filename>')
