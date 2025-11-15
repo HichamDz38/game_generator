@@ -395,6 +395,23 @@ const executionStateRef = useRef(executionState);
       }
     }
     
+    // Check if skip was requested one more time after loop exits (in case of timing issue)
+    if (skipRequestedRef.current) {
+      console.log(`[${pathId}] Skip requested for node ${node.data.label} (after loop)`);
+      skipRequestedRef.current = false;
+      
+      // Set node to orange (skipped)
+      setNodes(nds => nds.map(n => ({
+        ...n,
+        style: n.id === node.id 
+          ? { ...n.style, backgroundColor: '#ff9800', border: '2px solid #f57c00' }
+          : n.style
+      })));
+      
+      // Return true to continue flow (skip this node)
+      return true;
+    }
+    
     // If we reach here, user clicked RETRY (resume button)
     console.log(`[${pathId}] User clicked RETRY - retrying node ${node.data.label}`);
     
@@ -1558,10 +1575,16 @@ const executeConditionNode = async (node, pathId = null) => {
   
   console.log(`Skip requested for failed node ${failedNodeId}`);
   
-  // Set the skip flag - the error handler will detect it
+  // Set the skip flag FIRST - the error handler will detect it
   skipRequestedRef.current = true;
   
-  // Remove from failed nodes list
+  // Then clear pause state so the waiting loop exits and checks the skip flag
+  setPausedDueToError(false);
+  setFailedNodeId(null);
+  setIsPaused(false);
+  isPausedRef.current = false;
+  
+  // Log and update state AFTER setting skip flag
   updateExecutionState(prev => ({
     ...prev,
     failedNodes: prev.failedNodes.filter(id => id !== failedNodeId),
@@ -1573,12 +1596,6 @@ const executeConditionNode = async (node, pathId = null) => {
       message: `Skipped failed node`,
     }]
   }));
-  
-  // Clear pause state so the waiting loop exits
-  setPausedDueToError(false);
-  setFailedNodeId(null);
-  setIsPaused(false);
-  isPausedRef.current = false;
 };
 
 

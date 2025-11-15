@@ -52,7 +52,6 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToClients, onNavigateToDevi
             title={isFlowRunning ? "Cannot navigate while flow is running" : "Return to scenarios"}
           >
             SCENARIOS
-            {isFlowRunning && " (Disabled during execution)"}
           </a>
           <a 
             href="/clients"
@@ -66,7 +65,6 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToClients, onNavigateToDevi
             title={isFlowRunning ? "Cannot navigate while flow is running" : "Manage game clients"}
           >
             CLIENTS
-            {isFlowRunning && " (Disabled during execution)"}
           </a>
           <a 
             href="/devices"
@@ -80,7 +78,6 @@ function Navbarr({ onReturnScenarioSelect, onNavigateToClients, onNavigateToDevi
             title={isFlowRunning ? "Cannot navigate while flow is running" : "Physical devices monitor"}
           >
             DEVICES
-            {isFlowRunning && " (Disabled)"}
           </a>
           <a href="/settings">SETTINGS</a>
         </ul>
